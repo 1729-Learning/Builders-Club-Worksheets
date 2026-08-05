@@ -11,11 +11,25 @@
     synthesis — "Draft from my work" pulls ONLY the student's words from `synthesizesFrom` steps;
                 isArtifact:true → the accepted answer becomes the hub card's final artifact
 
+  Optional worksheet fields:
+    extra:     true — bonus worksheet. Renders on the EXTRAS shelf at the bottom of the home
+               page, contributes nothing to the artifact counter, and awards no XP. Steps in
+               an extra worksheet should carry no `xp` at all.
+    freeRoam:  true — every section and step is open from day one regardless of the global
+               free-roam setting. Always set alongside extra:true.
+
+  Optional section fields:
+    weeks:         'Weeks 5–6' — when this happens in class; shown as a 🗓 chip. Extras use 'Anytime'.
+    alwaysUnlocked: true — this section ignores section gating (e.g. the Ship It walkthrough).
+
   Optional step fields:
     buildsOn:  ['sectionId/stepId', …] — earlier work this step builds on. Pinned above the
                answer box in the UI and handed to the reviewer. Keys are globally unique, so
                cross-worksheet references work.
-    resources: [{ title, url, note }] — curated external reading ("Go deeper"), max 2 per step.
+    resources: [{ title, url, note }] — curated reading ("Go deeper"), max 2 external per step.
+               A url starting with '#' is an internal link into another worksheet
+               (e.g. '#/w/people-skills/s/story-telling') and renders as its own
+               "On the extras shelf" block instead of opening a new tab.
 
   Section ids and step keys must be unique ACROSS worksheets (state is keyed by sectionId/stepId).
   Video segments are transcript-verified excerpts from public YC / Karpathy talks — each
@@ -60,6 +74,7 @@ const MVP_WORKSHEET = {
           id: 'journal-problems',
           type: 'journal',
           title: 'Problems in my life',
+          resources: [{ title: 'Founder Stories — Where Ideas Come From', url: '#/w/founder-stories/s/idea-origins', note: 'Two accounts of how real products started, including a founder who built every one of his from something he needed himself.' }],
           prompt: 'List every real problem you bumped into this week — yours or ones you watched someone else have. Small and boring is great. One per box, at least 10.',
           listAnswer: { min: 10, max: 15, itemLabel: 'Problem', placeholder: 'Something that wasted time, caused stress, or made someone improvise…' },
           xp: 15,
@@ -73,6 +88,7 @@ const MVP_WORKSHEET = {
           id: 'pick-top-5',
           type: 'journal',
           title: 'Pick your top 3 by impact',
+          buildsOn: ['problem-statement/journal-problems'],
           prompt: 'From your list above, pick the 3 that impact your life (or someone you know) the most. One per box, and add a few words on WHY it makes the cut.',
           listAnswer: { min: 3, max: 3, itemLabel: 'Problem', placeholder: '[problem] — [why: how often · what it costs · why I care]' },
           xp: 15,
@@ -124,7 +140,7 @@ const MVP_WORKSHEET = {
           },
           rubric: `- Contains THREE distinct problem statements drawn from the student's own listed problems (not new invented ones)
 - Each names a SPECIFIC person or narrow group (not "people", "students", "everyone")
-- Each has a struggle, a root cause ("because…"), and a concrete consequence/cost
+- Each has a struggle, a root cause, and a concrete consequence/cost
 - Neither contains a solution, product, or app idea
 - Each is falsifiable — a real person could confirm or deny it`,
         },
@@ -158,8 +174,7 @@ const MVP_WORKSHEET = {
           rubric: `- Names WHO has it most acutely (a narrower group than the problem statement is fine)
 - States HOW OFTEN it happens (a guess is acceptable if framed as one)
 - Describes what those people DO about it today
-- Says why the current workaround isn't good enough
-- Written as a testable belief ("I believe/think…"), not a proven fact`,
+- Says why the current workaround isn't good enough`,
         },
         {
           id: 'video-interview-run',
@@ -191,7 +206,7 @@ const MVP_WORKSHEET = {
         {
           id: 'survey-questions',
           type: 'exercise',
-          reviewerNote: 'This step is a survey red-team. Before judging, ROLE-PLAY a realistic person from the student\'s own problem area (use their prior work to pick who) answering each of the student\'s survey questions in one short line each, exactly as a real person would — including the vague or useless answers that leading questions produce. Put the role-play inside your feedback, clearly formatted, THEN break character and explain what it revealed. Pass only if the questions are non-leading, ask about actual behavior (not opinions or predictions), and at least one uses a "tell me about the last time…" shape.',
+          reviewerNote: 'This step is a survey red-team. Before judging, ROLE-PLAY a realistic person from the student\'s own problem area (use their prior work to pick who) answering each of the student\'s survey questions in one short line each, exactly as a real person would — including the vague or useless answers that leading questions produce. Put the role-play inside your feedback, clearly formatted, THEN break character and explain what it revealed. Pass only if the questions are non-leading and ask about actual behavior (not opinions or predictions).',
           title: 'Build your interview questions',
           buildsOn: ['problem-statement/problem-hypothesis'],
           resources: [
@@ -209,7 +224,6 @@ const MVP_WORKSHEET = {
           rubric: `- Exactly 3 interview questions + 1 survey question, all aimed at testing the student's stated hypothesis
 - All questions ask about actual past behavior or specific experiences, not opinions or predictions
 - No leading questions (nothing that presumes the answer or mentions the student's own problem framing as fact)
-- At least one question uses a "tell me about the last time…" or similarly concrete shape
 - The survey question is answerable in one tap/line (scale, multiple choice, or single fact)`,
         },
         {
@@ -243,7 +257,7 @@ const MVP_WORKSHEET = {
             good: 'Student editors struggle to track who\'s writing what because assignments live in DMs, which costs them 2–3 blank pages every issue. TODAY: the editor re-asks everyone weekly. WHY THAT FAILS: people reply late or not at all, so pages stay blank until deadline night.',
             bad: 'Organization is hard for busy students. <em>(nobody can disagree with this, which is exactly the problem)</em>',
           },
-          rubric: `- Line 1 is ONE sentence in the [specific person] struggles to [X] because [root cause], costing [consequence] shape
+          rubric: `- Opens with a one-sentence problem statement: a specific person, their struggle, the root cause, and what it costs them
 - Includes what those people DO about it today, and why that workaround falls short
 - Consistent with (or a deliberate sharpening of) the student's earlier statements and hypothesis
 - Specific person/group, concrete cost, falsifiable
@@ -284,6 +298,7 @@ const MVP_WORKSHEET = {
           type: 'exercise',
           title: 'Plan your outreach',
           buildsOn: ['problem-statement/survey-questions'],
+          resources: [{ title: 'People Skills — The Networking Call', url: '#/w/people-skills/s/networking-call', note: 'A professional interviewer\'s five rules for the call itself, and how to phrase an ask someone can say yes to.' }],
           prompt: 'Time to actually reach people. Name THREE real, reachable people or places in your problem area you\'ll contact first (names, teams, servers, forums — specific), then write the actual outreach message you\'ll send, in this shape: who you are → one line on what you\'re researching → a small ask (15–20 minutes), no pitching. Your interview questions are pinned below — this message is how they get used.',
           placeholder: '1. [name] — [why they\'re the right person to ask]…\n\nMessage: "Hi [name] — I\'m [you], and I\'m researching [topic]…"',
           xp: 30,
@@ -366,16 +381,16 @@ const MVP_WORKSHEET = {
           prompt: 'Turn what you heard (pinned below) into THREE need statements, one per box: [your user] needs a way to [X] because [Y]. Needs, not features — if your sentence contains an app, a button, or an AI, dig one level deeper. Every "because" should trace to something in your research.',
           listAnswer: { min: 3, max: 3, itemLabel: 'Need', placeholder: '[your user] needs a way to [X] because [what your research showed]' },
           xp: 30,
-          masteryHint: 'Skippable if the student\'s prior research or hypothesis work already contains 3+ clearly separated user needs in a [user] needs a way to [X] because [Y] shape, grounded in things real people said.',
+          masteryHint: 'Skippable if the student\'s prior research or hypothesis work already contains 3+ clearly separated user needs grounded in things real people said.',
           lessonPanel: {
             point: 'A need is <b>solution-free</b>. "Needs a spreadsheet" is a feature; "needs a way to see what\'s already ordered without asking around" is a need. The "because" must trace back to something a real person told you or you observed.',
             good: 'Baristas need a way to swap shifts without texting the whole staff, because a single swap currently takes 20+ messages.',
             bad: 'Users need an AI-powered dashboard. <em>(that\'s your solution wearing a need costume)</em>',
           },
-          rubric: `- THREE distinct need statements in the [user] needs a way to [X] because [Y] form
+          rubric: `- THREE distinct need statements, each naming who needs it, what they need to be able to do, and why
 - The user matches the person in their problem statement (or a deliberate, stated narrowing)
-- Each [X] is a capability/outcome, NOT a feature, product, or technology
-- Each [because Y] is grounded in their reported research or observations, not invented
+- What they need is a capability/outcome, NOT a feature, product, or technology
+- Each reason is grounded in their reported research or observations, not invented
 - The three needs are genuinely different, not one need rephrased`,
         },
         {
@@ -442,7 +457,7 @@ const MVP_WORKSHEET = {
             bad: 'Feature: AI integration. <em>(what does the user actually see happen?)</em>',
           },
           rubric: `- Every top user need from their prior work has at least one feature mapped to it
-- Each entry uses a clear need → feature link
+- It's clear which need each feature is meant to serve
 - Each feature is concrete (a user-visible behavior, not a technology name or buzzword)
 - No orphan features that answer no stated need`,
         },
@@ -602,6 +617,10 @@ const MVP_WORKSHEET = {
           type: 'synthesis',
           isArtifact: true,
           title: 'Your MVP plan',
+          resources: [
+            { title: 'People Skills — Telling It As A Story', url: '#/w/people-skills/s/story-telling', note: 'Before you present this plan: the structure behind persuasive talks, and why the audience is the protagonist rather than you.' },
+            { title: 'People Skills — Slide Design', url: '#/w/people-skills/s/slide-design', note: 'Three rules that improve most decks, and a theme you decide once and then reuse.' },
+          ],
           prompt: 'Write the plan you\'ll present and build next semester: the problem (one line), the user, the core need, the 2–3 core features, the first testable version, your first testers, and what success looks like. Use "Draft from my work" to pull it together from everything you\'ve written.',
           placeholder: '',
           xp: 35,
@@ -773,7 +792,7 @@ const AI_WORKSHEET = {
             good: 'If a teacher will grade it as MY voice, AI never writes sentences — it only critiques mine. (Learned from the book-report incident.)',
             bad: 'Use AI responsibly. <em>(what would you actually DO differently on Tuesday?)</em>',
           },
-          rubric: `- 3 to 5 rules, each a single clear sentence
+          rubric: `- 3 to 5 short, clear rules
 - Each rule is actionable — a specific behavior, not a value statement
 - At least one rule says when NOT to use AI
 - Rules visibly connect to the student's own logged moments or task calls
@@ -987,7 +1006,11 @@ const AI_WORKSHEET = {
           reviewerNote: 'Before judging, ROLE-PLAY a fast, literal-minded AI coding agent given this spec. In your feedback, briefly restate what you would build following ONLY what is written — and flag every place you had to guess because the spec didn\'t say (one short line per guess, e.g. "- You didn\'t say what happens after submit, so I guessed a blank page"). THEN break character and judge. IMPORTANT: if the underlying idea is too big to spec (a platform, a company, months of work), do NOT ask for more detail — say it\'s too big and coach them to slice out one small piece worth building first. Pass only when the spec names the user, 2-3 concrete actions with visible outcomes, and verifiable "done when" checks, with no vague adjectives standing in for behavior and no guess left open.',
           title: 'Your build spec',
           buildsOn: ['ai-specs/pick-build'],
-          resources: [{ title: 'How I AI — A 3-step AI coding workflow (Ryan Carson)', url: 'https://www.youtube.com/watch?v=fD4ktSkNCw4', note: 'Watch a 5-time founder write a real spec and task list on screen, then hand it to an AI that builds it — slowing down to write clearly is what makes the AI fast.' }],
+          resources: [
+            { title: 'How I AI — A 3-step AI coding workflow (Ryan Carson)', url: 'https://www.youtube.com/watch?v=fD4ktSkNCw4', note: 'Watch a 5-time founder write a real spec and task list on screen, then hand it to an AI that builds it — slowing down to write clearly is what makes the AI fast.' },
+            { title: 'AI Coding — Specifications as the Source of Truth', url: '#/w/pro-coding/s/spec-truth', note: 'Why the specification, not the generated code, is the artifact worth keeping.' },
+            { title: 'AI Coding — Planning and Reviewing', url: '#/w/pro-coding/s/agent-driving', note: 'Once the spec is written: how experienced developers plan a change, then review what the agent produced.' },
+          ],
           prompt: 'Turn your idea (pinned below) into the spec you\'d hand an AI coding tool: WHO uses it, the 2–3 things they can DO, what visibly HAPPENS for each action, and DONE WHEN — two or three checks a stranger could verify. The AI will play a literal-minded builder and build EXACTLY what you wrote — every gap becomes a guess. Revise until no guess is left, because this is the artifact: the spec you\'ll actually build from.',
           placeholder: 'WHO: [your users]…\nDO: [action + what they enter]…\nHAPPENS: [what visibly changes]…\nDONE WHEN: [a check a stranger could verify]…',
           xp: 35,
@@ -1226,7 +1249,544 @@ const SHIP_SECTION = {
 
 MVP_WORKSHEET.sections.push(SHIP_SECTION);
 
-const WORKSHEETS = [MVP_WORKSHEET, AI_WORKSHEET];
+/* ==================================================================
+   EXTRAS · the bonus shelf
+   extra:true keeps these out of the artifact count and off the XP
+   ledger; freeRoam:true opens every section and step from day one.
+   No `xp` on steps or sections here — they earn nothing on purpose.
+   ================================================================== */
+
+const AI_CODING_WORKSHEET = {
+  id: 'pro-coding',
+  title: 'AI Coding',
+  extra: true,
+  freeRoam: true,
+  sections: [
+
+    {
+      id: 'agent-driving',
+      num: 1,
+      title: 'Planning and Reviewing',
+      kicker: 'Extra 01 · Agent Workflow',
+      weeks: 'Anytime',
+      tagline: 'How experienced developers plan a change before any code is written, and how they review what the agent produced.',
+      steps: [
+        {
+          id: 'video-plan-mode',
+          type: 'video',
+          title: 'Planning before writing code',
+          prompt: 'Kieran Klaassen ships production features with Claude Code daily. This segment covers what happens before any code is written — the step most people skip.',
+          video: { youtubeId: 'g6z_4TMDiaE', start: 454, end: 637 },
+          videoRecap: [
+            'His planning step is an expanded version of plan mode. It uses more tokens deliberately, because it researches the problem before writing anything.',
+            'It reads the existing codebase first, so it follows the patterns already in use instead of introducing new ones partway through.',
+            'It searches the web for best practices on the specific problem, and checks which versions of your libraries you are using so it does not write code for the wrong one.',
+            'The research runs as separate sub-agents with their own context windows, which keeps the main conversation focused.',
+            'The output is a single artifact: a plan a human reads and approves before work begins.',
+          ],
+        },
+        {
+          id: 'video-review-pass',
+          type: 'video',
+          title: 'Reviewing the agent\'s work',
+          prompt: 'Working code is not finished code. This segment covers the review pass he runs after a feature works — and why he approves each fix rather than letting the agent apply them.',
+          video: { youtubeId: 'g6z_4TMDiaE', start: 2098, end: 2334 },
+          videoRecap: [
+            'Once a feature works, he runs a separate review pass looking for three things: security risks, unnecessary code, and anything that could be simpler.',
+            'The review uses several reviewer agents with fixed, distinct perspectives — security, architecture, simplicity — rather than one general request to clean things up.',
+            'Their findings are combined into one prioritized list, which he approves item by item. Nothing is fixed automatically, because at this stage an agent can easily expand the scope or remove working code.',
+            'Findings are ranked P1 (never merge, such as security flaws), P2 (sometimes important), and P3 (nice to have), and written to a to-do folder he can see.',
+            'A single command then applies the approved fixes and opens the pull request.',
+          ],
+        },
+        {
+          id: 'agent-rules',
+          type: 'exercise',
+          title: 'Write three rules for your agent',
+          prompt: 'A rules file records a mistake so you never have to catch it twice. Write THREE rules you would put in your own agent\'s rules file. Each needs two parts: the rule itself, specific enough that a machine could follow it, and the mistake it came from — something you actually watched an AI do to your work.',
+          placeholder: 'RULE: …\nCAME FROM: the time it …\n\nRULE: …\nCAME FROM: …',
+          buildsOn: ['ai-judgment/ai-scoreboard'],
+          reviewerNote: 'Review these as an engineer who has maintained a rules file for a year. A rule an agent cannot verifiably follow ("write good code", "be careful") does not work — explain why and rewrite one of theirs as an example. Every rule should trace to a failure they actually observed; note any rule that appears to come from theory instead. Their AI scoreboard is the best source of evidence, so point them to it if their examples are generic. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'A rules file is memory for a system that has none. The agent forgets everything between conversations, so each rule you write is a lesson it cannot lose. The test for a rule: <b>could the agent tell whether it followed it?</b> "Be careful with the database" cannot be checked. "Never write a migration that drops a column — propose it and stop" can.',
+            good: 'RULE: Before changing any file, list every other file that reads from it and show me the list. CAME FROM: it renamed a function in one file and left three callers broken, which I only found when a page came up blank.',
+            bad: 'RULE: Write clean, high-quality code. CAME FROM: sometimes the code is messy. <em>(An agent has no way to check whether it followed this.)</em>',
+          },
+          rubric: `- Three rules, each specific enough that an agent could verifiably follow or violate it
+- Every rule is paired with a CONCRETE mistake actually observed — a real incident, not a hypothetical
+- No rule is a vague virtue ("be careful", "write clean code", "don't make mistakes")
+- At least one rule constrains the agent's process (stop and ask, show me first, don't touch X) rather than just the output
+- The rules don't contradict each other`,
+        },
+      ],
+    },
+
+    {
+      id: 'vibe-prod',
+      num: 2,
+      title: 'AI Coding in Production',
+      kicker: 'Extra 02 · Real Stakes',
+      weeks: 'Anytime',
+      tagline: 'An engineer at Anthropic shipped a 22,000-line change written mostly by AI. This is what made that safe to do.',
+      steps: [
+        {
+          id: 'video-pm-for-model',
+          type: 'video',
+          title: 'Providing context: you are the product manager',
+          prompt: 'Erik Schluntz shipped a 22,000-line change to production that was largely written by Claude. This segment covers the shift in thinking that makes that possible, and the limits he put in place around it.',
+          video: { youtubeId: 'fHWFF_pnqDk', start: 596, end: 860 },
+          videoRecap: [
+            'His framing: "ask not what Claude can do for you but what you can do for Claude." When the AI writes the code, your job is product manager for the model.',
+            'A useful test for how much context to provide: what would a brand-new employee need to succeed at this task? Someone on their first day needs a tour of the codebase and the real requirements. Supplying that is now your responsibility.',
+            'His practice: spend 15–20 minutes building a plan in a separate conversation — the model explores the files, and you agree on what will change and which patterns to follow — then hand that plan to a fresh conversation and let it work.',
+            'He is direct that this does not work for everyone: if you cannot ask the right questions, you cannot manage the model effectively.',
+            'Why a 22,000-line change was manageable: deliberate containment. The changes were concentrated in leaf nodes where some technical debt was acceptable, with close human review reserved for the parts that had to stay extensible.',
+            'And verifiable checkpoints — inputs and outputs a human could check, plus long-running stress tests — which established that it worked without anyone reading every line.',
+          ],
+        },
+        {
+          id: 'video-how-you-learn',
+          type: 'video',
+          title: 'How you learn when the AI writes the code',
+          prompt: 'An audience member asks a fair question: developers used to learn by working through syntax and wiring components together, so how do you learn now? This segment is his answer.',
+          video: { youtubeId: 'fHWFF_pnqDk', start: 990, end: 1195 },
+          videoRecap: [
+            'The question: learning used to come from working through syntax, libraries, and the connections between parts of a program. What replaces that?',
+            'He acknowledges the concern, then compares it to earlier objections that programmers got worse once they stopped writing assembly by hand.',
+            'His own experience is that he learns faster now. While reviewing code he asks the model to explain an unfamiliar library and why it was chosen over the alternatives — effectively a pair programmer who is always available. His caveat: people who are not curious will not learn this way.',
+            'The larger advantage for beginners is volume. Lessons about architecture and product fit that used to take two years to play out can now happen over months.',
+            'On how much to specify in advance: give bare requirements when you genuinely do not care how something is done, and go into structural detail only once you know the codebase. He advises against rigid templates and over-constraining the model — think about what you would give a junior engineer to succeed.',
+          ],
+        },
+        {
+          id: 'checkpoints',
+          type: 'exercise',
+          title: 'Define two verifiable checkpoints',
+          buildsOn: ['ai-specs/write-spec'],
+          prompt: 'A verifiable checkpoint is something you can check in under a minute that shows a piece of the work is correct, without reading the code. Design TWO for what you are building. For each, write what you feed in, exactly what you expect to see, and how you would know it had broken. Then add one line naming the part of your build that has no checkpoint yet.',
+          placeholder: 'CHECKPOINT 1 — I feed in: … / I should see: … / it has broken if: …\nCHECKPOINT 2 — I feed in: … / I should see: … / it has broken if: …\nNO CHECKPOINT YET: …',
+          reviewerNote: 'A checkpoint only counts if the student could run it in under a minute and get an unambiguous yes or no. If a checkpoint amounts to "I look at it and see if it seems right", explain that this is observation rather than verification, and show what a checkable version would look like. If the expected output is vague ("it should work"), ask for the specific thing they would see on screen. Give credit for checkpoints that would catch a silent failure, since those are the hardest to notice. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'The failures that cause the most damage are the <b>silent</b> ones — a save that does not save, a total that does not update. They do not crash, so checking whether things "look fine" never finds them. A checkpoint finds them without reading the code: one specific input, one specific expected output, checked in a minute.',
+            good: 'CHECKPOINT 1 — I feed in: log a 200-calorie snack, then force-quit the app. I should see: 200 still recorded when I reopen it. It has broken if: the number resets or the entry is gone.',
+            bad: 'CHECKPOINT 1 — I feed in: use the app. I should see: everything working correctly. <em>(There is no specific input or expected result here, so there is nothing to check against.)</em>',
+          },
+          rubric: `- Two checkpoints, each with a specific INPUT, a specific EXPECTED OUTPUT, and a stated failure signal
+- Each could realistically be run in about a minute and gives an unambiguous yes/no
+- Neither relies on "it looks right" or reading the code to judge
+- At least one would catch a SILENT failure (something that doesn't crash but is wrong)
+- Names one part of the build that has no checkpoint yet`,
+        },
+      ],
+    },
+
+    {
+      id: 'spec-truth',
+      num: 3,
+      title: 'Specifications as the Source of Truth',
+      kicker: 'Extra 03 · What to Keep',
+      weeks: 'Anytime',
+      tagline: 'We write a prompt, keep the code it generates, and discard the prompt. This section argues we have it the wrong way round.',
+      steps: [
+        {
+          id: 'video-spec-source',
+          type: 'video',
+          title: 'Why the specification holds the value',
+          prompt: 'Sean Grove works on this problem at OpenAI. This segment is his argument that the specification, not the generated code, is the artifact worth keeping.',
+          video: { youtubeId: '8rABwKRsec4', start: 277, end: 507 },
+          videoRecap: [
+            'Working with AI feels productive because it is communication-first: you describe the outcome you want, and the code is a secondary artifact produced downstream from that description.',
+            'But the usual habit is backwards — we keep the generated code and treat the prompt as disposable, when the specification is where the value actually sits.',
+            'His comparison: it is like choosing to "shred the source and then... very carefully version control the binary."',
+            'A written specification is also what aligns people. It is the thing a team can debate, refer back to, and agree on. Without one, you have an idea rather than a plan.',
+            'Code is a lossy version of the specification. As with decompiling a binary, you cannot recover the intent, the naming, or the reasoning from the code alone.',
+            'And a sufficiently robust specification can be aimed at many outputs — TypeScript, Rust, servers, clients, documentation, tutorials — the way source code compiles for different processors.',
+          ],
+        },
+        {
+          id: 'spec-survives',
+          type: 'journal',
+          title: 'What survives without the code',
+          prompt: 'Suppose every line of your project\'s code disappeared tonight, but you kept one document. Write down what that document would need to contain for you to rebuild the same product — not the same code, the same product. Then note which parts of your current understanding exist only in your head and would be lost.',
+          placeholder: 'WHAT THE DOCUMENT MUST CONTAIN:\n- …\n- …\n\nCURRENTLY ONLY IN MY HEAD: …',
+          buildsOn: ['ai-specs/write-spec'],
+          minLines: 4,
+          lessonPanel: {
+            point: 'This is not hypothetical. Every time you open a new conversation, <b>the code survives and your reasoning does not</b> — the agent reads the files and has no way to know why any of it is the way it is. The document described here is what closes that gap, and it is the same document a teammate would need.',
+            good: 'CURRENTLY ONLY IN MY HEAD: why the schedule is organized per shift rather than per person. Marcus explained the reason in an interview, and it is why the app works at all — but it is not written down anywhere.',
+            bad: 'CURRENTLY ONLY IN MY HEAD: the code. <em>(The code is what the exercise removes. The question is what you know that the code does not say.)</em>',
+          },
+        },
+      ],
+    },
+
+    {
+      id: 'watch-build',
+      num: 4,
+      title: 'Watching a Real Build',
+      kicker: 'Extra 04 · Case Study',
+      weeks: 'Anytime',
+      tagline: 'A real app with real users: the number its developer tracked, and the unglamorous work that moved it.',
+      steps: [
+        {
+          id: 'video-hundred-users',
+          type: 'video',
+          title: 'What 100 users reveal that 10 cannot',
+          prompt: 'Chris Raroque built an app and got it to 100 users. This segment covers what became visible at 100, and the decision he made as a result.',
+          video: { youtubeId: 'ghxgQaxZ9Kw', start: 40, end: 220 },
+          videoRecap: [
+            'The first 10 users mainly tell you whether the app works at all. At 100, the number he considers most important becomes measurable: retention.',
+            'His specific metric is week-one retention, and he is at roughly 3% — for every 100 signups, about three people are still using it a week later.',
+            'He looked up the benchmark before reacting: calorie-tracking apps average about 3–10% week-one retention, which puts him at the low end of a normal range rather than in failure territory.',
+            'That produces a concrete decision: spend one week improving retention before releasing on the App Store and onboarding 500 more users, since first impressions only happen once.',
+            'His first change is widgets, chosen deliberately — a lock screen widget is seen roughly 150 times a day and opens the app in one tap, which removes friction from a daily habit.',
+            'He ships only the core widgets rather than his full design backlog, trading polish for speed as a deliberate choice.',
+          ],
+        },
+        {
+          id: 'video-boring-bugs',
+          type: 'video',
+          title: 'Fixing bugs as retention work',
+          prompt: 'After the retention features came the part that is easy to postpone. This segment covers the bug that would have quietly cost him users, and the feature he had shipped without noticing was missing.',
+          video: { youtubeId: 'ghxgQaxZ9Kw', start: 352, end: 484 },
+          videoRecap: [
+            'Retention is usually discussed as a feature problem. He argues bugs matter just as much: if logging food silently fails to save, the user loses confidence and leaves.',
+            'The most damaging one: you could edit nutrition information inline, but closing the app too quickly meant the change was not saved. An app that saves half the time is an app people stop using.',
+            'Other silent failures had accumulated — the calorie calculation sometimes did not run, and the quick-add feature did not update the total at the bottom of the screen.',
+            'A user on the feedback board asked where to enter their current weight. He had built a settings page with calorie and macro goals but no height or weight fields, which are the inputs those goals are calculated from.',
+            'He rebuilt the settings page, updated onboarding to collect that data, and added metric and imperial units, since more than half his users are outside the US.',
+            'His conclusion: postponing a bug to work on a more interesting feature has a cost, and that cost shows up in retention.',
+          ],
+        },
+        {
+          id: 'build-decision',
+          type: 'journal',
+          title: 'A decision you would have made differently',
+          buildsOn: ['mvp-plan/final-plan'],
+          prompt: 'Choose ONE decision he made in these two segments and write down what he did, what you would have done instead, and what that would have cost you. Then add one line naming something in your own project you are postponing in favour of more interesting work.',
+          placeholder: 'HIS DECISION: …\nWHAT I WOULD HAVE DONE: …\nWHAT THAT WOULD HAVE COST ME: …\nWHAT I AM CURRENTLY POSTPONING: …',
+          minLines: 4,
+          lessonPanel: {
+            point: 'The value in watching someone build is <b>finding where your instinct differs from theirs</b>, because that gap tends to be your next mistake. He checked a benchmark before reacting, fixed silent bugs before launching, and shipped partial widgets instead of a complete design. At least one of those is probably not what you would have done.',
+            good: 'HIS DECISION: he checked the industry retention benchmark before reacting to 3%. WHAT I WOULD HAVE DONE: assumed 3% meant the app had failed and rebuilt onboarding from scratch. WHAT THAT WOULD HAVE COST ME: a week rebuilding something that was not actually broken.',
+            bad: 'HIS DECISION: he fixed bugs. WHAT I WOULD HAVE DONE: I would also fix bugs. <em>(Look for a decision where your instinct genuinely differs — that is where the useful information is.)</em>',
+          },
+        },
+      ],
+    },
+  ],
+};
+
+const FOUNDER_STORIES_WORKSHEET = {
+  id: 'founder-stories',
+  title: 'Founder Stories',
+  extra: true,
+  freeRoam: true,
+  sections: [
+
+    {
+      id: 'idea-origins',
+      num: 1,
+      title: 'Where Ideas Come From',
+      kicker: 'Extra 01 · Origins',
+      weeks: 'Anytime',
+      tagline: 'Two accounts of how real products actually started, and what they suggest about choosing what to work on.',
+      steps: [
+        {
+          id: 'video-crowded-market',
+          type: 'video',
+          title: 'A crowded market is not a closed market',
+          prompt: 'Y Combinator partners discuss a mistake they see often: founders abandoning good ideas because the space looks competitive. The example is a company that deliberately entered the market it believed was most crowded.',
+          video: { youtubeId: 'TANaRNMbYgk', start: 2330, end: 2483 },
+          videoRecap: [
+            'A common pattern: founders talk themselves out of a good idea because two competitors have launched on TechCrunch and raised a seed round.',
+            'GigaML applied to YC with an education idea (helping students in India apply to US colleges), moved to fine-tuning as a service, could not make that sustainable, and then looked for an industry to apply their expertise to.',
+            'The area they were most interested in — AI customer support — was also the one they believed was most crowded. They entered it anyway and concentrated on winning a single willing early customer, the delivery company Zepto.',
+            'The partners\' reading: in most crowded B2B markets you have to win on sales, but here most competing products simply did not work well. Replacing a human support team is a genuinely difficult technical problem, and their engineering strength let them deliver what others could not.',
+            'Worth noting: they are described as strong engineers and not natural salespeople, and it took roughly a year of searching before they found the right idea. The partners treat that timeline as normal.',
+          ],
+        },
+        {
+          id: 'video-own-need',
+          type: 'video',
+          title: 'Building for yourself, then testing demand',
+          prompt: 'A solo founder describes where each of his products came from, why copied ideas tend to fail, and how he decides whether an idea is worth building — which is not by thinking about it harder.',
+          video: { youtubeId: 'k-aEdS28AH0', start: 284, end: 416 },
+          videoRecap: [
+            'Every product he has built started from something he needed himself. He made his first app because he wanted it to exist, and around a hundred thousand other people turned out to want it too.',
+            'The business grew by chaining needs: he built a second tool to help market the first one, and that tool became far larger than the original, so he stopped working on the original.',
+            'His argument against copying someone else\'s niche: because the idea is not connected to your own curiosity, you do not stay with it long enough — and that is usually what determines whether it ever reaches users.',
+            'He does not debate internally whether an idea is good. He publishes a landing page or a short video and reads the response: if a thousand people arrive and nobody clicks buy, the idea or its framing is wrong.',
+            'He reframes the question from "is this a good idea?" to "how would I frame this so it is valuable?" — would he use it, and does it save someone time or money.',
+          ],
+        },
+        {
+          id: 'idea-pattern',
+          type: 'exercise',
+          title: 'Name the pattern, then find it in your own life',
+          prompt: 'Choose one story from this worksheet and state the underlying pattern in a single sentence — not what the company does, but the repeatable move behind it. Then find that same pattern somewhere in your own life or area of interest: describe the specific situation, and what the equivalent move would be for you.',
+          placeholder: 'THE PATTERN, IN ONE SENTENCE: …\nWHERE I SEE IT IN MY OWN LIFE: …\nWHAT THE EQUIVALENT MOVE WOULD BE FOR ME: …',
+          buildsOn: ['problem-statement/journal-problems'],
+          reviewerNote: 'Check two things specifically. First, whether the pattern is stated as a transferable principle or is just a summary of the story — "they entered a crowded market" is a summary; "when competitors have raised money but their products do not work, the market is open to whoever can build a working one" is a pattern. Second, whether the application is a real situation with specifics rather than a restatement of the pattern in different words. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'A pattern is only useful if it <b>transfers</b>. The test: could someone in a completely different field act on your sentence without knowing the original story? If your sentence still contains the company\'s name or product, it is a summary rather than a pattern.',
+            good: 'THE PATTERN: When existing products in a market are widely funded but work badly, technical ability alone can win the market. WHERE I SEE IT: Three apps claim to organize club schedules at my school and every one of them loses events — nobody I know trusts them.',
+            bad: 'THE PATTERN: GigaML succeeded in AI customer support because they were good engineers. <em>(This describes one company. Someone in a different field could not act on it.)</em>',
+          },
+          rubric: `- The pattern is stated in ONE sentence as a transferable principle, not a summary of the story
+- The sentence would make sense to someone who had not seen the video (no company name or product standing in for the idea)
+- The application names a specific real situation from the student's own life or area of interest, with concrete detail
+- The equivalent move is an action the student could actually take, not a restatement of the pattern
+- The pattern and the application genuinely match each other`,
+        },
+      ],
+    },
+
+    {
+      id: 'first-customers',
+      num: 2,
+      title: 'Getting Your First Customers',
+      kicker: 'Extra 02 · First Users',
+      weeks: 'Anytime',
+      tagline: 'How founders actually found the first people who used their product. Almost none of it looks like marketing.',
+      steps: [
+        {
+          id: 'video-fifty-founders',
+          type: 'video',
+          title: 'How founders found their first customer',
+          prompt: 'One question put to a long series of founders. Listen for how ordinary and small-scale the answers are — and how many of them involve contacting one person directly.',
+          video: { youtubeId: 'NZp5j5hvn9I', start: 0, end: 189 },
+          videoRecap: [
+            'The answers are almost never "marketing": a cold email, messaging people on Reddit, a hand-written outreach message, LinkedIn.',
+            'One team went door to door and waited outside a food truck until the owner took a break, then signed him on the spot.',
+            'Another left a voicemail for a physical therapist. She called back, they explained why they had started the company, and she signed because she felt they were sincere.',
+            'One team sold a $250-a-month contract from customer discovery calls before writing any code, then built and deployed a rough version in seven days.',
+            'A personal finance team mocked up the product they wanted, put a waitlist page behind it, posted it to a Reddit group they were already part of, and had close to a thousand signups within 24 hours.',
+          ],
+        },
+        {
+          id: 'video-first-testers',
+          type: 'video',
+          title: 'Recruiting testers where you already have an audience',
+          prompt: 'A realistic timeline for a small app: how long the first version took, where the first few dozen testers came from, and how long it was before the app was actually stable.',
+          video: { youtubeId: 'V_4kiR3R4QU', start: 256, end: 358 },
+          videoRecap: [
+            'The timeline is deliberately unremarkable: building started in May, a basic timer took a few weeks, and there was no first version until August.',
+            'Before launching anywhere public, they invited a few dozen people from RedNote to test it, then spent about a month on feedback and bug fixes.',
+            'The launch was solid rather than dramatic — roughly 3,000 downloads in the first week — and syncing bugs meant the app was not really stable until December or January.',
+            'They had a group of testers at all because his girlfriend had been posting her illustrations on RedNote and already had followers there. That existing foothold is the entire distribution story for the early stage.',
+            'Later growth came from other accounts featuring the app in roundup posts and a reshare in Taiwan, which roughly doubled downloads overnight.',
+          ],
+        },
+        {
+          id: 'first-users-plan',
+          type: 'exercise',
+          title: 'Plan your first three users',
+          prompt: 'Write how you would get three real people using what you are building, starting this week. Name each of the three specifically — an actual person, group, or place, not a category. For each, state the exact channel you would reach them through and the first message you would send. Then add one line: which tactic from these two videos you are copying, and why it fits your situation.',
+          placeholder: 'PERSON 1: … / CHANNEL: … / FIRST MESSAGE: …\nPERSON 2: … / CHANNEL: … / FIRST MESSAGE: …\nPERSON 3: … / CHANNEL: … / FIRST MESSAGE: …\nTACTIC I AM COPYING, AND WHY IT FITS: …',
+          buildsOn: ['user-needs/outreach-plan'],
+          reviewerNote: 'Review this as someone who has done cold outreach. Point out any target that is a category rather than a specific person or place ("students at my school" is a category; "the three club presidents who run sign-ups" is not). Check that each channel is one the student can actually access this week, and that each first message is short enough that a stranger would finish reading it. If the chosen tactic does not match their situation — a paid-ads approach for someone with no budget, for instance — say so and suggest one from the videos that does fit. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'The founders in these videos did not find a channel — they found <b>a person</b>. Almost every story is one specific human contacted directly, or one community the founder was already part of. Scale is a later problem; the first three users are a list of names.',
+            good: 'PERSON 1: Ms. Okafor, who runs the front desk at the rec centre and keeps the schedule on paper. CHANNEL: in person Thursday after 4pm, when the desk is quiet. FIRST MESSAGE: "I built something for the sign-up sheet problem you mentioned — could I show you for two minutes?"',
+            bad: 'PERSON 1: Students who need better scheduling. CHANNEL: social media. FIRST MESSAGE: I would post about my app. <em>(No specific person, no specific channel, and nothing to send.)</em>',
+          },
+          rubric: `- Three targets, each a SPECIFIC person, group, or place — not a category like "students" or "small businesses"
+- Each has a concrete channel the student could actually use within a week
+- Each has an actual first message written out, short enough that a stranger would read it
+- Names one specific tactic from the videos and explains why it fits the student's situation
+- The plan does not depend on money, an existing audience, or anything the student does not have`,
+        },
+      ],
+    },
+  ],
+};
+
+const PEOPLE_WORKSHEET = {
+  id: 'people-skills',
+  title: 'People Skills',
+  extra: true,
+  freeRoam: true,
+  sections: [
+
+    {
+      id: 'networking-call',
+      num: 1,
+      title: 'The Networking Call',
+      kicker: 'Extra 01 · Conversations',
+      weeks: 'Anytime',
+      tagline: 'How to prepare for a conversation with someone further along than you, and make good use of the time they give you.',
+      steps: [
+        {
+          id: 'video-conversation',
+          type: 'video',
+          title: 'Five rules from a professional interviewer',
+          prompt: 'Celeste Headlee is a radio interviewer — her job is getting people to say interesting things out loud. This segment covers the first five of her rules, which apply directly to a call with a mentor or a potential user.',
+          video: { youtubeId: 'R1vskiVDwl4', start: 258, end: 465 },
+          videoRecap: [
+            'Do not multitask, and it is not only about the phone. Being half-present is worse than politely ending the conversation, because the other person can tell.',
+            'Do not lecture. Enter the conversation assuming you have something to learn: everybody is an expert in something you know nothing about.',
+            'Ask open-ended questions. "Were you terrified?" invites a one-word answer; "What was that like?" requires the person to think.',
+            'Follow the conversation rather than your notes. When a good question occurs to you mid-answer, let it go — people who hold on to a prepared question have stopped listening.',
+            'If you do not know something, say so. In her words, talk should not be cheap.',
+          ],
+        },
+        {
+          id: 'prep-card',
+          type: 'exercise',
+          title: 'Prepare for a real call',
+          buildsOn: ['problem-statement/final-statement', 'user-needs/outreach-plan'],
+          prompt: 'Choose someone you could plausibly get 20 minutes with — a mentor, a family friend, a founder in your area of interest, or the manager of a business where you noticed a problem. Write a preparation card with four parts: (1) who they are and why this person specifically, (2) your introduction — who you are and what you are working on, in one line, (3) three open-ended questions this person is particularly well placed to answer, and (4) your ask, in one sentence.',
+          placeholder: 'WHO, AND WHY THIS PERSON: …\nMY ONE-LINE INTRODUCTION: …\nQ1: …\nQ2: …\nQ3: …\nMY ASK: …',
+          reviewerNote: 'Review this as someone who takes a lot of these calls. Point out any question that could be answered by a web search, any question answerable with yes or no, and any introduction that would lose a busy adult\'s attention. If the ask is vague ("pick your brain", "any advice"), name that and offer a concrete version. Do not push them toward contacting a well-known person — a local business manager is a perfectly good choice. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'The ask is the part most people get wrong. <b>"Can I pick your brain?"</b> puts the work on the other person — they have to work out what you actually want. A specific, small request ("could I show you two screens and tell me which one you would use?") is easy to answer. And the ask belongs at the end of the call, after the conversation has earned it.',
+            good: 'MY ASK: You have hired around 50 shift workers — could I read you my three interview questions and have you tell me which one would irritate you?',
+            bad: 'MY ASK: I would love to pick your brain about entrepreneurship and hear any advice you have. <em>(Too broad to answer well, and it is not clear what you would do with the response.)</em>',
+          },
+          rubric: `- Names a specific, real, plausibly-reachable person and says why THAT person (not "a founder")
+- The one-line introduction is actually one line and covers who they are and what they're working on
+- All three questions are open-ended (a yes/no or easily-searchable question does not pass)
+- At least one question is one this person is particularly well placed to answer from experience
+- The ask is one concrete sentence that is easy to say yes to — not "pick your brain" or "any advice"`,
+        },
+      ],
+    },
+
+    {
+      id: 'story-telling',
+      num: 2,
+      title: 'Telling It As A Story',
+      kicker: 'Extra 02 · Presenting',
+      weeks: 'Anytime',
+      tagline: 'The structure behind persuasive presentations, and how to apply it to the work you are presenting.',
+      steps: [
+        {
+          id: 'video-story-structure',
+          type: 'video',
+          title: 'The structure behind persuasive talks',
+          prompt: 'Nancy Duarte compared Martin Luther King Jr.\'s "I Have a Dream" with Steve Jobs\' iPhone launch and found the same underlying structure. This is the one to borrow for a demo-day presentation.',
+          video: { youtubeId: '1nYFpuc2Umk', start: 301, end: 524 },
+          videoRecap: [
+            'The basic story shape: a likable protagonist wants something, encounters an obstacle, and is changed by the end. The important adjustment for presenters is that the audience is the protagonist, not the speaker — in her phrasing, "You\'re not Luke Skywalker, you\'re Yoda."',
+            'Open by establishing what is — the current situation your audience recognizes. Then contrast it with what could be, and widen that gap as far as the facts allow.',
+            'The middle of a talk moves back and forth between what is and what could be, which deliberately surfaces the resistance an audience already feels rather than ignoring it.',
+            'Her analogy: a sailboat tacks against the wind in order to use it, and a well-set sail moves the boat faster than the wind itself.',
+            'Close on the final turn: a call to action, followed by a specific picture of the world once the idea exists.',
+          ],
+        },
+        {
+          id: 'three-beat',
+          type: 'exercise',
+          title: 'Write your problem as a three-part story',
+          prompt: 'Take the problem you are working on and write it in three parts. WHAT IS: the situation today, told through one specific person in one specific moment, without statistics. THE TENSION: why it stays broken, and what that costs them. WHAT COULD BE: the same person in the same moment, after your product exists. Then add one line: the call to action you would end a presentation on.',
+          placeholder: 'WHAT IS: It is 7:40am and Marcus is …\nTHE TENSION: …\nWHAT COULD BE: …\nCALL TO ACTION: …',
+          buildsOn: ['problem-statement/journal-problems'],
+          reviewerNote: 'Respond as an audience member at a demo day rather than a grader. Say honestly whether the WHAT IS put you in a room with a specific person or opened with a statistic. If they made themselves the protagonist rather than the user, point that out — it is the most common error here. Reward specific detail, and name any part that stays general. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'Statistics tend to be what we reach for when we do not have a scene. <b>"73% of students report scheduling stress"</b> is easy to ignore. <b>"It is 7:40am and Marcus is texting three group chats to find out whether he is on register"</b> holds attention — and it conveys the same fact.',
+            good: 'WHAT IS: It is 7:40am. Marcus is standing outside the café scrolling through three group chats trying to find out whether he is on register today. He worked yesterday. Nobody knows.',
+            bad: 'WHAT IS: Scheduling in small businesses is inefficient and causes frustration for employees. <em>(Accurate, but there is no person and no moment, so there is nothing for an audience to picture.)</em>',
+          },
+          rubric: `- WHAT IS is a specific scene: a named or clearly-drawn person, a moment in time, something concrete happening — NOT a statistic or a general statement
+- THE TENSION explains why it stays broken and what it costs that person
+- WHAT COULD BE returns to the SAME person in the SAME moment, changed — not a feature list
+- The user is the protagonist of the story; the builder is not
+- The call to action is one clear sentence asking for something specific`,
+        },
+      ],
+    },
+
+    {
+      id: 'slide-design',
+      num: 3,
+      title: 'Slide Design',
+      kicker: 'Extra 03 · Presenting',
+      weeks: 'Anytime',
+      tagline: 'Three rules that improve most decks, and a theme you decide once and then reuse.',
+      steps: [
+        {
+          id: 'video-slide-rules',
+          type: 'video',
+          title: 'Three rules for readable slides',
+          prompt: 'This segment covers the three rules that matter most in slide design. Two of them contradict the default behaviour of every presentation template.',
+          video: { youtubeId: 'Iwpi1Lm6dFo', start: 365, end: 634 },
+          videoRecap: [
+            'One message per slide. With two messages, an audience picks one and loses the other — the same way hearing your own name across a noisy room pulls your attention away from the person in front of you.',
+            'The redundancy effect: putting full sentences on a slide and reading them aloud at the same time leaves audiences retaining almost nothing. Move the text into your notes and leave short text plus an image.',
+            'Attention is drawn reliably to four things: movement, signalling colours such as red, orange and yellow, high contrast, and large objects. These can be used deliberately.',
+            'Default templates invert the sizing — the largest element is the headline and the smallest is the content — so audiences spend around 70% of their attention on a headline that is usually not the point.',
+            'The rule that follows: the most important item on a slide should also be the largest item on the slide.',
+          ],
+        },
+        {
+          id: 'theme-rules',
+          type: 'exercise',
+          title: 'Define your deck\'s four theme rules',
+          prompt: 'A theme is four decisions made once so you are not re-making them the night before. Write yours: (1) TYPE — which font, and the specific sizes for the largest element and for everything else, (2) COLOUR — background, text, and one accent colour, plus what the accent is used for, (3) LAYOUT — where the main element sits on every slide and what is always in the corner, and (4) LIMIT — your maximum words per slide, and where the words you cut go instead.',
+          placeholder: 'TYPE: …\nCOLOUR: …\nLAYOUT: …\nLIMIT: … / cut words go to: …',
+          reviewerNote: 'Assess whether these rules could actually be followed under time pressure, or whether they are intentions. "Clean modern font" is not a rule; a font name and two point sizes is. If the accent colour has no stated purpose, note that it will end up used everywhere. If the word limit has no destination for the cut text, note that the limit is unlikely to hold. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'A theme is a constraint you set while you have time, so that a rushed version of you cannot undo it. The test for each rule: <b>could someone else build a slide from it without asking you a question?</b> "Big title" does not pass. "Title 20pt, one message 60pt, positioned bottom-left" does.',
+            good: 'LIMIT: 12 words maximum per slide. Anything I cut goes into the speaker notes and I say it out loud instead.',
+            bad: 'LIMIT: Keep slides clean and not too wordy. <em>(There is no number here, so there is nothing to check a slide against.)</em>',
+          },
+          rubric: `- TYPE names an actual font and gives specific sizes (or a clear ratio) for the largest element vs. the rest
+- COLOUR specifies background, text, and exactly ONE accent — and states what the accent is used for
+- LAYOUT is specific enough that another person could place elements without asking a question
+- LIMIT is a number, and there is a stated destination for the words that get cut
+- The rules reflect the core idea from the video: the most important item on a slide is the largest item on the slide`,
+        },
+      ],
+    },
+
+    {
+      id: 'teamwork',
+      num: 4,
+      title: 'Effective Teamwork',
+      kicker: 'Extra 04 · Working Together',
+      weeks: 'Anytime',
+      tagline: 'What research finds separates teams that deliver, and how to set expectations with your own team.',
+      steps: [
+        {
+          id: 'video-psych-safety',
+          type: 'video',
+          title: 'The study that produced the opposite result',
+          prompt: 'Amy Edmondson set out to show that better hospital teams make fewer mistakes. Her data showed the reverse, and the explanation is one of the more useful findings about how small teams work.',
+          video: { youtubeId: 'LhoLuui9gX8', start: 310, end: 524 },
+          videoRecap: [
+            'She measured team effectiveness and tracked medication errors, expecting the stronger teams to make fewer. The stronger teams appeared to make more.',
+            'The explanation was not that they made more errors, but that they were willing to discuss them. Mistakes were reported and examined rather than concealed.',
+            'She tested this by sending in a research assistant who knew nothing — not the error rates, not her hypothesis. His independent ratings of how openly each unit discussed mistakes closely tracked the error data. She later named the underlying factor psychological safety.',
+            'First practical step: frame the work as a learning problem rather than an execution problem. State the uncertainty out loud, so it is clear that everyone\'s input is needed.',
+            'Second: acknowledge your own fallibility — say that you may miss something and need to hear from others. This works coming from peers, not only from whoever is leading.',
+            'Third: ask a lot of questions. Genuine curiosity is what creates the need for other people to speak.',
+          ],
+        },
+        {
+          id: 'working-agreements',
+          type: 'exercise',
+          title: 'Write three working agreements for your team',
+          prompt: 'Write three agreements you would actually propose to your team this week. Each needs a trigger (WHEN this happens) and a behaviour (WE do this). Between your three, cover at least two situations: someone is stuck or has fallen behind, and someone disagrees with the direction while everyone else agrees. Then add one line on how you would raise these with your team in your own words.',
+          placeholder: 'WHEN … WE …\nWHEN … WE …\nWHEN … WE …\nHOW I WOULD ACTUALLY PROPOSE THESE: …',
+          reviewerNote: 'Review these from the perspective of a teammate who has not read any of the theory. Assess whether each agreement would survive an ordinary week or whether it is a slogan. An agreement with no trigger is a value rather than an agreement — say so. Be particularly attentive to agreements that only work if everyone is already comfortable, since the purpose is to make it safe before that is true. Also check the last line: reciting the term "psychological safety" to friends is unlikely to work, and it is worth telling them that plainly. Keep the tone matter-of-fact and instructive.',
+          lessonPanel: {
+            point: 'Teams usually stall not because nobody cares, but because <b>admitting you are stuck feels more costly than staying stuck</b>. A working agreement lowers that cost by deciding in advance that saying so is normal. That is why the trigger matters: without a trigger, there is no agreement.',
+            good: 'WHEN someone has not pushed anything in three days, WE ask "what is in your way?" in the group chat rather than "did you do it yet?", and whoever has time picks up one piece of it.',
+            bad: 'WE will communicate openly and support each other. <em>(There is no trigger and no specific behaviour, so nothing about how the team works would change.)</em>',
+          },
+          rubric: `- Three agreements, each with an explicit trigger (WHEN …) and an explicit behaviour (WE …)
+- One agreement covers someone being stuck or behind, and does so without blame
+- One agreement covers a lone dissenting opinion — a way for one person to disagree and be heard
+- The agreements would work even if the team is NOT already comfortable with each other
+- The final line is something the student could actually say out loud to their team, in their own words, without jargon`,
+        },
+      ],
+    },
+  ],
+};
+
+const WORKSHEETS = [MVP_WORKSHEET, AI_WORKSHEET, AI_CODING_WORKSHEET, FOUNDER_STORIES_WORKSHEET, PEOPLE_WORKSHEET];
 
 if (typeof module !== 'undefined' && module.exports) module.exports = WORKSHEETS;
 if (typeof window !== 'undefined') window.WORKSHEETS = WORKSHEETS;

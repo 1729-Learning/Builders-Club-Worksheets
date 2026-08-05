@@ -202,6 +202,8 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 .resources .rs-link{color:var(--ink);font-weight:600;text-decoration:underline}
 .resources .rs-link:hover{color:var(--accent-h)}
 .resources .rs-note{color:var(--muted);font-size:12.5px}
+/* links into the extras shelf — same block, different colour so they read as "in here, not out there" */
+.resources.is-internal{border-color:var(--accent);background:var(--blue-tint)}
 
 /* lesson panel */
 .lesson{margin:20px 0 0;border:2.5px dashed var(--ink);border-radius:var(--radius-sm);background:var(--pad-2);
@@ -238,11 +240,6 @@ textarea.answer:disabled{cursor:not-allowed}
 .ask-btn:hover{transform:translate(-1px,-1px);box-shadow:var(--shadow-h)}
 .ask-btn:disabled{opacity:.4;cursor:not-allowed}
 .req-note{font-family:var(--font-mono);font-size:10.5px;color:var(--muted)}
-
-/* ask-assistant inline chat */
-.askbox{margin-top:12px;display:none;gap:8px}
-.askbox.open{display:flex}
-.askbox input{flex:1 1 auto;font-family:var(--font-body);font-size:14px;border:2.5px solid var(--ink);border-radius:var(--radius-sm);padding:9px 12px;outline:none;background:#fff}
 
 /* video */
 .video-frame{position:relative;margin:16px 0 0;border:2.5px solid var(--ink);border-radius:var(--radius-sm);overflow:hidden;
@@ -402,3 +399,22 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .ws-title{font-family:var(--font-display);font-size:clamp(22px,4vw,32px);line-height:1.05;margin:12px 0 6px}
 .ws-sub{font-size:14.5px;color:var(--muted);margin:0;line-height:1.5}
 .ws-count{font-family:var(--font-mono);font-size:11px;font-weight:700;white-space:nowrap;margin-left:8px}
+
+/* extras — bonus worksheets, collapsed into a dropdown each */
+.ws-fold{margin:14px 0 0;background:var(--surface);border:3px solid var(--ink);
+  border-radius:var(--radius);box-shadow:var(--shadow)}
+.ws-fold:first-of-type{margin-top:44px}
+.wf-head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;
+  list-style:none;border-radius:11px}
+.wf-head::-webkit-details-marker{display:none}
+.wf-head:hover{background:var(--pad-2)}
+.wf-badge{flex:none;font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.12em;
+  padding:4px 8px;background:var(--yellow);border:2px solid var(--ink);border-radius:var(--radius-sm);
+  transform:rotate(-1.5deg)}
+.wf-title{flex:1;min-width:0;font-family:var(--font-display);font-size:clamp(15px,2.4vw,19px);line-height:1.15}
+.wf-count{flex:none;font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted)}
+.wf-chev{flex:none;font-size:15px;transition:transform .18s ease}
+.ws-fold[open] .wf-chev{transform:rotate(180deg)}
+.ws-fold[open] .wf-head{border-bottom:3px dashed var(--hair);border-radius:11px 11px 0 0}
+.wf-body{padding:6px 16px 16px}
+.wf-body .section{box-shadow:var(--shadow-sm)}

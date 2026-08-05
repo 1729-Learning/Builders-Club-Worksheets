@@ -61,6 +61,26 @@ function wsOfSection(sectionId) {
   return WORKSHEETS.find(w => w.sections.some(s => s.id === sectionId));
 }
 
+/* The extras shelf (bottom of the home page) is bonus material: it counts for
+   nothing — no XP, no artifact tally — and every step is open from day one. */
+function isExtraSection(section) {
+  const ws = wsOfSection(section.id);
+  return !!(ws && ws.extra);
+}
+
+// The "+N XP" badge on a done stamp — extras earn nothing, so they show nothing.
+function xpPill(section, n) {
+  return isExtraSection(section) ? '' : `<span class="xpgain">+${n} XP</span>`;
+}
+
+// True when steps in this section can be done in any order: either the student
+// turned free roam on globally, or the worksheet is free-roam by design.
+function roams(section) {
+  if (appSettings.freeRoam) return true;
+  const ws = wsOfSection(section.id);
+  return !!(ws && ws.freeRoam);
+}
+
 /* ---------------------------------------------------------------- state */
 
 let state = null;
@@ -101,6 +121,7 @@ function sectionDone(section) {
 
 function sectionUnlocked(ws, i) {
   if (appSettings.freeRoam) return true;
+  if (ws.freeRoam) return true; // extras: dip in anywhere
   if (ws.sections[i].alwaysUnlocked) return true; // e.g. the Ship It setup walkthrough — needed mid-semester, no content dependency
   return i === 0 || sectionDone(ws.sections[i - 1]);
 }
@@ -113,8 +134,10 @@ function awardXP(n) {
   updateHeader();
 }
 
-// XP is earned once per step — redoing a step never re-awards it.
-function awardStepXP(st, n) {
+// XP is earned once per step — redoing a step never re-awards it. Extras award
+// nothing at all, so nothing about the bonus shelf can inflate the header.
+function awardStepXP(st, n, section) {
+  if (section && isExtraSection(section)) return;
   if (st.xpAwarded) return;
   st.xpAwarded = true;
   awardXP(n);
@@ -125,6 +148,7 @@ function awardStepXP(st, n) {
 function updateHeader() {
   let done = 0, total = 0;
   for (const w of WORKSHEETS) {
+    if (w.extra) continue; // the bonus shelf is not part of the semester's count
     total += w.sections.length;
     done += w.sections.filter(sectionDone).length;
   }
@@ -165,6 +189,7 @@ function route() {
   if (m) {
     const ws = WORKSHEETS.find(w => w.id === m[1]);
     if (ws) {
+      if (ws.extra) setFold(ws.id, true); // coming back from an extras section: don't land on a closed drawer
       renderHome();
       const el = document.getElementById('ws-' + ws.id);
       if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
@@ -228,12 +253,19 @@ function sectionCardHTML(ws, section, i) {
   </section>`;
 }
 
+/* Which extras dropdowns are expanded — survives navigation and reloads. */
+const openFolds = new Set(JSON.parse(localStorage.getItem('bc.folds') || '[]'));
+function setFold(id, open) {
+  if (open) openFolds.add(id); else openFolds.delete(id);
+  localStorage.setItem('bc.folds', JSON.stringify([...openFolds]));
+}
+
 // One big page: every worksheet with all of its section cards.
 function renderHome() {
   const view = $('#view');
   view.classList.remove('wide');
 
-  const blocks = WORKSHEETS.map(w => {
+  const block = w => {
     const done = w.sections.filter(sectionDone).length;
     const allDone = done === w.sections.length;
     return `
@@ -251,14 +283,34 @@ function renderHome() {
       </section>` : ''}
       ${w.sections.map((s, i) => sectionCardHTML(w, s, i)).join('')}
     </div>`;
-  }).join('');
+  };
+
+  // Extras collapse into a dropdown each — they shouldn't cost the student a
+  // screen of scrolling on the way to the work that's actually assigned.
+  const fold = w => {
+    const done = w.sections.filter(sectionDone).length;
+    return `
+    <details class="ws-fold" id="ws-${w.id}" data-fold="${w.id}"${openFolds.has(w.id) ? ' open' : ''}>
+      <summary class="wf-head">
+        <span class="wf-badge">EXTRA</span>
+        <span class="wf-title">${esc(w.title)}</span>
+        <span class="wf-count">${done}/${w.sections.length}</span>
+        <span class="wf-chev" aria-hidden="true">▾</span>
+      </summary>
+      <div class="wf-body">${w.sections.map((s, i) => sectionCardHTML(w, s, i)).join('')}</div>
+    </details>`;
+  };
+
+  const core = WORKSHEETS.filter(w => !w.extra).map(block).join('');
+  const extras = WORKSHEETS.filter(w => w.extra).map(fold).join('');
 
   view.innerHTML = `
     <section class="hero">
       <span class="kicker">BUILDERS CLUB · ONE SEMESTER</span>
       <h1>Your<br>Worksheets</h1>
     </section>
-    ${blocks}`;
+    ${core}
+    ${extras}`;
   updateHeader();
 }
 
@@ -385,9 +437,13 @@ function buildsOnHTML(section, step) {
 // Curated external reading for a step ("Go deeper").
 function resourcesHTML(step) {
   if (!step.resources || !step.resources.length) return '';
-  return `<div class="resources"><span class="rs-label">📚 Go deeper</span>
-    ${step.resources.map(r => `<a class="rs-link" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>${r.note ? `<span class="rs-note">— ${esc(r.note)}</span>` : ''}`).join('<br>')}
-  </div>`;
+  // A url starting with '#' points at another worksheet in here — same tab, own block.
+  const rows = rs => rs.map(r => `<a class="rs-link" href="${esc(r.url)}"${r.url[0] === '#' ? '' : ' target="_blank" rel="noopener"'}>${esc(r.title)}</a>${r.note ? `<span class="rs-note">— ${esc(r.note)}</span>` : ''}`).join('<br>');
+  const ext = step.resources.filter(r => r.url[0] !== '#');
+  const int = step.resources.filter(r => r.url[0] === '#');
+  return `
+    ${ext.length ? `<div class="resources"><span class="rs-label">📚 Go deeper</span>${rows(ext)}</div>` : ''}
+    ${int.length ? `<div class="resources is-internal"><span class="rs-label">🎁 On the extras shelf</span>${rows(int)}</div>` : ''}`;
 }
 
 function lessonHTML(step, k) {
@@ -556,7 +612,6 @@ function boardHTML(section, step, status) {
     : !done ? `<span class="req-note">at least ${step.minPerSide || 1} real moment per side</span>` : '';
   const actions = reviewed
     ? `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
-       <button class="ask-btn" data-askopen="${k}">💬 Ask the assistant</button>
        <button class="btn" data-review="${k}">${st.attempts > 0 ? 'Resubmit ▸' : 'Submit & Review'}</button>
        ${reqNote}`
     : `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
@@ -564,15 +619,11 @@ function boardHTML(section, step, status) {
        ${!done ? reqNote : ''}`;
   return `
     ${done && reviewed ? `<button class="redo-btn" data-redostep="${k}" title="Clear this step and do it again">↻ Redo</button>` : ''}
-    ${done ? `<div class="done-stamp"><span class="big">${doneLabel}</span><span class="xpgain">+${step.xp} XP</span></div>` : ''}
+    ${done ? `<div class="done-stamp"><span class="big">${doneLabel}</span>${xpPill(section, step.xp || 15)}</div>` : ''}
     ${buildsOnHTML(section, step)}
     ${lessonHTML(step, k)}
     <div class="board cols-${cols.length}">${cols.map(col).join('')}</div>
     <div class="answer-tools">${actions}</div>
-    ${reviewed ? `<div class="askbox" id="ask-${id}">
-      <input type="text" placeholder="Ask Builders AI a question about this step…" id="askin-${id}">
-      <button class="ask-btn" data-asksend="${k}">Send</button>
-    </div>` : ''}
     ${reviewed ? threadHTML(st, k) : ''}`;
 }
 
@@ -603,14 +654,18 @@ function stepBodyHTML(section, step, status) {
     const redoBtn = `<button class="redo-btn" data-redostep="${k}" title="Clear this step and do it again">↻ Redo</button>`;
     if (step.type === 'video') {
       return `${redoBtn}
-        <div class="done-stamp"><span class="big">Segment complete ✓</span><span class="xpgain">+${step.xp} XP</span></div>
-        ${step.videoRecap ? `<div class="recap"><h4>What that segment gave you</h4><ul>${step.videoRecap.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}`;
+        <div class="done-stamp"><span class="big">Segment complete ✓</span>${xpPill(section, step.xp || 20)}</div>
+        ${step.videoRecap ? `<div class="recap"><h4>What that segment gave you</h4><ul>${step.videoRecap.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}
+        ${resourcesHTML(step)}`;
     }
+    // Resources stay visible after the step is done — that's often exactly when
+    // the follow-on reading (and the extras cross-links) is worth clicking.
     return `${redoBtn}
       ${guide}
       <div class="prev-answer"><span class="pa-label">Your accepted answer</span>${esc(st.answer)}</div>
       ${threadHTML(st, k)}
-      <div class="done-stamp"><span class="big">${step.isArtifact ? 'Artifact earned ✓' : 'Step complete ✓'}</span><span class="xpgain">+${step.xp}${step.isArtifact ? ' +' + section.xp : ''} XP</span></div>`;
+      <div class="done-stamp"><span class="big">${step.isArtifact ? 'Artifact earned ✓' : 'Step complete ✓'}</span>${xpPill(section, (step.xp || 15) + (step.isArtifact ? (section.xp || 0) : 0))}</div>
+      ${resourcesHTML(step)}`;
   }
 
   /* ---- active ---- */
@@ -645,16 +700,11 @@ function stepBodyHTML(section, step, status) {
       ${answerField}
       <div class="answer-tools">
         ${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
-        ${!isJournal ? `<button class="ask-btn" data-askopen="${k}">💬 Ask the assistant</button>` : ''}
         ${!isJournal ? `<button class="ask-btn" data-copyprompt="${k}" title="Copy this whole step — task, checklist, and your work so far — as a prompt you can paste into any AI chat">📋 Copy for another AI</button>` : ''}
         ${isJournal
           ? `<button class="btn" data-savejournal="${k}">Save entry</button>`
           : `<button class="btn" data-review="${k}">${st.attempts > 0 ? 'Resubmit ▸' : 'Submit & Review'}</button>`}
         ${reqNote}
-      </div>
-      <div class="askbox" id="ask-${id}">
-        <input type="text" placeholder="Ask Builders AI a question about this step…" id="askin-${id}">
-        <button class="ask-btn" data-asksend="${k}">Send</button>
       </div>
     </div>
     ${resourcesHTML(step)}
@@ -673,7 +723,7 @@ function modeBtnHTML() {
 }
 
 function stepViewable(section, i) {
-  if (appSettings.freeRoam) return true;
+  if (roams(section)) return true;
   const a = activeStepIndex(section);
   if (a === -1) return true;
   const k = keyOf(section, section.steps[i]);
@@ -722,7 +772,7 @@ function renderFocus(ws, section) {
   let status;
   if (isDone(k)) status = 'done';
   else if (isMastered(k)) status = 'mastered';
-  else if (idx === activeIdx || appSettings.freeRoam) status = 'active';
+  else if (idx === activeIdx || roams(section)) status = 'active';
   else status = 'locked';
   const cls = { done: 'is-done', mastered: 'is-mastered', active: 'is-active', locked: 'is-locked' }[status];
 
@@ -777,7 +827,7 @@ function renderScroll(ws, section) {
     let status;
     if (isDone(k)) status = 'done';
     else if (isMastered(k)) status = 'mastered';
-    else if (i === activeIdx || appSettings.freeRoam) status = 'active';
+    else if (i === activeIdx || roams(section)) status = 'active';
     else status = i < activeIdx || activeIdx === -1 ? 'done' : 'locked';
     const cls = { done: 'is-done', mastered: 'is-mastered', active: 'is-active', locked: 'is-locked' }[status];
 
@@ -810,7 +860,7 @@ function renderScroll(ws, section) {
     if (step.type !== 'video') return;
     const k = keyOf(section, step);
     if (isDone(k) || isMastered(k)) return;
-    if (i === activeIdx || appSettings.freeRoam) mountVideo(section, step);
+    if (i === activeIdx || roams(section)) mountVideo(section, step);
   });
   maybeAutoDraft(section);
   updateHeader();
@@ -851,7 +901,7 @@ function completeVideo(section, step) {
   const st = stepState(k);
   if (st.status === 'done') return;
   st.status = 'done';
-  awardStepXP(st, step.xp || 20);
+  awardStepXP(st, step.xp || 20, section);
   saveState(true);
   setTimeout(() => advanceFocus(section), 600);
 }
@@ -891,7 +941,7 @@ function saveJournal(section, step) {
     state.artifacts[section.id] = st.answer;
     gained += section.xp || 0;
   }
-  awardStepXP(st, gained);
+  awardStepXP(st, gained, section);
   saveState(true);
   if (step.isArtifact) {
     const ws = wsOfSection(section.id);
@@ -928,7 +978,7 @@ function saveBoard(section, step) {
 
   if (!boardMeetsMinimums(k, step, st)) return;
   st.status = 'done';
-  awardStepXP(st, step.xp || 15);
+  awardStepXP(st, step.xp || 15, section);
   saveState(true);
   if (wasDone) {
     const btn = document.querySelector(`[data-saveboard="${k}"]`);
@@ -1069,7 +1119,7 @@ async function submitReview(section, step) {
       gained += section.xp || 0;
     }
     applyMasteryFlags(verdict.masteryFlags, step);
-    awardStepXP(st, gained);
+    awardStepXP(st, gained, section);
     saveState(true);
     setTimeout(() => {
       if (step.isArtifact) {
@@ -1096,38 +1146,7 @@ function applyMasteryFlags(flags, sourceStep) {
   });
 }
 
-/* ---------------------------------------------------------------- assistant chat + draft */
-
-async function askAssistant(section, step) {
-  const k = keyOf(section, step);
-  const st = stepState(k);
-  const id = cssId(k);
-  const input = document.getElementById('askin-' + id);
-  const q = input.value.trim();
-  if (!q) { input.focus(); return; }
-  input.value = '';
-
-  st.thread.push({ role: 'user', text: q });
-  const qBubble = bubbleHTML({ role: 'user', text: q });
-  setLatest(k, qBubble + spinnerHTML('Thinking…'));
-  saveState();
-
-  let reply = '';
-  try {
-    const res = await fetch('/api/assist', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sectionId: section.id, stepId: step.id, kind: 'chat', message: q }),
-    });
-    const data = await res.json();
-    reply = data.offline ? 'The assistant is offline right now — check that Claude Code is logged in.' : data.text;
-  } catch {
-    reply = 'Couldn’t reach the local server — is `node server.js` still running?';
-  }
-  const m = { role: 'agent', text: reply };
-  st.thread.push(m); setLatest(k, qBubble + bubbleHTML(m));
-  refreshHistory(k);
-  saveState();
-}
+/* ---------------------------------------------------------------- draft */
 
 async function draftFromWork(section, step) {
   const k = keyOf(section, step);
@@ -1356,6 +1375,12 @@ function findByKey(k) {
 }
 
 function wire() {
+  // <details> fires toggle, not click — remember which extras are expanded.
+  document.addEventListener('toggle', e => {
+    const f = e.target.closest && e.target.closest('[data-fold]');
+    if (f) setFold(f.dataset.fold, f.open);
+  }, true);
+
   document.addEventListener('click', e => {
     const coll = e.target.closest('[data-collapse]');
     if (coll) {
@@ -1430,13 +1455,6 @@ function wire() {
       const l = document.getElementById('lesson-' + cssId(lesson.dataset.lesson));
       if (l) l.classList.toggle('open');
       lesson.classList.toggle('open');
-      return;
-    }
-
-    const askopen = e.target.closest('[data-askopen]');
-    if (askopen) {
-      const box = document.getElementById('ask-' + cssId(askopen.dataset.askopen));
-      if (box) { box.classList.toggle('open'); const inp = box.querySelector('input'); if (box.classList.contains('open') && inp) inp.focus(); }
       return;
     }
 
@@ -1515,9 +1533,6 @@ function wire() {
     const rev = e.target.closest('[data-review]');
     if (rev && !rev.disabled) { const { section, step } = findByKey(rev.dataset.review); submitReview(section, step); return; }
 
-    const send = e.target.closest('[data-asksend]');
-    if (send) { const { section, step } = findByKey(send.dataset.asksend); askAssistant(section, step); return; }
-
     const unm = e.target.closest('[data-unmaster]');
     if (unm) { delete state.mastery[unm.dataset.unmaster]; saveState(true); route(); return; }
   });
@@ -1552,13 +1567,7 @@ function wire() {
     toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
   }
 
-  // Enter sends the assistant question.
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.matches('.askbox input')) {
-      const btn = e.target.closest('.askbox').querySelector('[data-asksend]');
-      if (btn) btn.click();
-      return;
-    }
     // Enter in a list box: save immediately, then hop to the next box —
     // adding a fresh one if they're on the last box and under the max.
     if (e.key === 'Enter' && e.target.matches('.li-input')) {

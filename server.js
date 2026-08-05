@@ -5,7 +5,7 @@
     - serves ./public
     - GET/POST /api/state       → persists the single-student state to ./data/state.json
     - POST /api/review          → real AI review of a worksheet step via `claude -p`
-    - POST /api/assist          → freeform coach chat / synthesis draft via `claude -p`
+    - POST /api/assist          → synthesis draft ("draft from my work") via `claude -p`
   The AI rides the locally logged-in Claude Code subscription. No API keys.
 */
 'use strict';
@@ -432,22 +432,6 @@ Respond with ONLY a JSON object:
 }`;
 }
 
-function buildChatPrompt({ worksheet, section, step, message, state }) {
-  return `A student working on the "${worksheet.title}" worksheet is asking you a question mid-step.
-
-Where they are — Section: ${section.title} · Step: ${step.title}
-The task in front of them: ${step.prompt}
-${step.rubric ? `The rubric their answer will be reviewed against:\n${step.rubric}` : ''}
-
-Their prior accepted work:
-${priorWorkDigest(state, worksheet, null)}
-
-Their question:
-${message}
-
-Answer as their coach in 1-4 short sentences. Remember: nudge, don't solve. Never write their answer for them. Plain text only, no JSON, no markdown headers.`;
-}
-
 function buildDraftPrompt({ section, step, state }) {
   const sources = (step.synthesizesFrom || [])
     .map(id => {
@@ -567,16 +551,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/assist' && req.method === 'POST') {
-      const { sectionId, stepId, kind, message = '' } = await readBody(req);
+      const { sectionId, stepId } = await readBody(req);
       const found = findStep(sectionId, stepId);
       if (!found) return sendJSON(res, 404, { error: 'unknown step' });
       if (!aiAvailable()) return sendJSON(res, 200, { text: '', offline: true });
-      const state = readState();
       try {
-        const prompt = kind === 'draft'
-          ? buildDraftPrompt({ ...found, state })
-          : buildChatPrompt({ ...found, message: String(message), state });
-        const text = await runText(prompt);
+        const text = await runText(buildDraftPrompt({ ...found, state: readState() }));
         return sendJSON(res, 200, { text });
       } catch (e) {
         console.error('[assist] failed:', e.message);
