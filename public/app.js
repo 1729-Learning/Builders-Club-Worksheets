@@ -330,8 +330,54 @@ async function renderSettings() {
   if (!s) { card.innerHTML = '<p class="sec-tagline">Couldn’t reach the local server — is it running?</p>'; return; }
   appSettings.freeRoam = !!s.freeRoam;
   card.innerHTML = settingsCardHTML(s);
-  card.insertAdjacentHTML('afterend', progressCardHTML(s) + dangerCardHTML());
+  card.insertAdjacentHTML('afterend', progressCardHTML(s) + dataCardHTML() + dangerCardHTML());
   updateHeader();
+}
+
+/* Export & restore: the Builder file is the readable portfolio; the JSON backup
+   is an exact snapshot of state.json for moving machines or undoing disasters. */
+function dataCardHTML() {
+  return `
+  <section class="section is-active">
+    <div class="sec-headtext">
+      <div class="sec-kicker">YOUR DATA</div>
+      <h2 class="sec-title">Export & restore</h2>
+    </div>
+    <p class="sec-tagline">The Builder file is the readable record of everything earned — the one to hand to a mentor. The backup is an exact snapshot of all progress on this machine; restoring one replaces everything with it.</p>
+    <div class="answer-tools">
+      <button class="btn" data-export>⬇ Builder file (.md)</button>
+      <button class="ask-btn" data-exportstate>⬇ Backup progress (.json)</button>
+      <button class="ask-btn" data-importstate>⬆ Restore from backup…</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+    </div>
+  </section>`;
+}
+
+function exportProgressBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `builders-progress-${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importProgressBackup(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // allow picking the same file again later
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { data = null; }
+  if (!data || typeof data !== 'object' || !data.steps || typeof data.steps !== 'object') {
+    alert('That file isn’t a progress backup — pick the .json file exported from this page.');
+    return;
+  }
+  const n = Object.values(data.steps).filter(st => st && st.status === 'done').length;
+  if (!confirm(`Restore this backup? It holds ${n} completed step${n === 1 ? '' : 's'} and ${data.xp || 0} XP. Everything currently on this machine will be replaced by it.`)) return;
+  state = data;
+  await saveState(true);
+  location.hash = '#/';
+  location.reload();
 }
 
 function dangerCardHTML() {
@@ -1467,6 +1513,12 @@ function wire() {
     const exp = e.target.closest('[data-export]');
     if (exp) { exportBuilderFile(); return; }
 
+    const exs = e.target.closest('[data-exportstate]');
+    if (exs) { exportProgressBackup(); return; }
+
+    const ims = e.target.closest('[data-importstate]');
+    if (ims) { const inp = document.getElementById('importFile'); if (inp) inp.click(); return; }
+
     const lesson = e.target.closest('[data-lesson]');
     if (lesson) {
       const l = document.getElementById('lesson-' + cssId(lesson.dataset.lesson));
@@ -1552,6 +1604,11 @@ function wire() {
 
     const unm = e.target.closest('[data-unmaster]');
     if (unm) { delete state.mastery[unm.dataset.unmaster]; saveState(true); route(); return; }
+  });
+
+  // The hidden file input on the Settings page (restore from backup).
+  document.addEventListener('change', e => {
+    if (e.target && e.target.id === 'importFile') importProgressBackup(e.target);
   });
 
   // Persist drafts as they type — plain answers, list rows, and board cards.
