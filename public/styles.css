@@ -140,7 +140,7 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 
 /* focus-mode step rail (flow view) */
 .sheet.wide{max-width:980px}
-.hero.compact{margin:34px 0 38px}
+.hero.compact{margin:34px 0 20px}
 .hero.compact h1{font-size:clamp(24px,4.5vw,34px);margin:0}
 .steprail{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;row-gap:10px;flex:1 1 auto}
 .railstep{width:36px;height:36px;flex:0 0 auto;padding:0;display:flex;align-items:center;justify-content:center;
@@ -356,7 +356,14 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .li-del{flex:0 0 auto;width:24px;height:24px;line-height:1;font-size:11px;font-weight:700;border:2px solid var(--ink);
   border-radius:999px;background:#fff;color:var(--muted);cursor:pointer;padding:0}
 .li-del:hover{background:var(--coral);color:#fff}
-.li-add{align-self:flex-start;margin-top:2px}
+.li-add-row{display:flex;align-items:center;gap:9px;width:100%;background:none;border:none;padding:0;cursor:pointer;text-align:left}
+.li-add-row .li-num{background:var(--pad-2);color:var(--muted);border-style:dashed;box-shadow:none}
+.li-add-box{flex:1 1 auto;font-family:var(--font-body);font-size:14.5px;color:var(--muted);background:transparent;
+  border:2.5px dashed var(--ink);border-radius:var(--radius-sm);padding:9px 12px;opacity:.7;transition:opacity .15s,background .15s}
+.li-add-row:hover .li-add-box{opacity:1;background:#fff}
+/* numbered lists: the breathing room splits evenly — half above the label, half below the add row */
+.answer-wrap:has(.list-answer){margin-top:11px}
+.answer-wrap:has(.list-answer) .answer-tools{margin-top:11px}
 
 /* walkthrough guide checklist */
 .guide{margin:16px 0 0;padding:14px 16px 14px 38px;border:2.5px solid var(--ink);border-radius:var(--radius-sm);
@@ -367,9 +374,7 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .guide a{color:var(--accent-h);font-weight:600}
 
 /* practice-interview call to action */
-.practice-cta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;
-  border:2.5px dashed var(--ink);border-radius:var(--radius-sm);background:var(--blue-tint)}
-.practice-cta .pc-note{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.practice-copy{display:block;margin:0 0 14px}
 
 /* class-week chip: which weeks of the semester a section belongs to */
 .wk-chip{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;

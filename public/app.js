@@ -473,7 +473,7 @@ function listAnswerHTML(step, st, k) {
     </div>`).join('');
   return `<div class="list-answer" data-listwrap="${k}">
     ${rows}
-    ${items.length < cfg.max ? `<button class="ask-btn li-add" data-listadd="${k}">+ Add ${esc((cfg.itemLabel || 'item').toLowerCase())}</button>` : ''}
+    ${items.length < cfg.max ? `<button class="li-add-row" data-listadd="${k}" title="Add another"><span class="li-num">+</span><span class="li-add-box">Add ${esc((cfg.itemLabel || 'item').toLowerCase())}</span></button>` : ''}
   </div>`;
 }
 
@@ -640,10 +640,7 @@ function stepBodyHTML(section, step, status) {
     ${guide}
     ${lessonHTML(step, k)}
     <div class="answer-wrap">
-      ${step.practice ? `<div class="practice-cta">
-        <button class="btn" data-copypractice="${k}">🎙 Copy the practice-interview setup</button>
-        <span class="pc-note">paste it into your own AI chat — it takes it from there</span>
-      </div>` : ''}
+      ${step.practice ? `<button class="btn practice-copy" data-copypractice="${k}">🎙 Copy the practice-interview setup</button>` : ''}
       <label class="field-label" for="ta-${id}">${fieldLabel}</label>
       ${answerField}
       <div class="answer-tools">
