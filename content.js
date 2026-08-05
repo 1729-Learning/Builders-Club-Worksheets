@@ -8,7 +8,7 @@
     video     — gated YouTube segment {youtubeId, start, end} (seconds); videoRecap shown on completion
     exercise  — AI review loop against `rubric`; optional `reviewerNote` adds special reviewer
                 instructions (role-plays, red-teams) injected into the review prompt
-    synthesis — "Draft from my work" pulls ONLY the student's words from `synthesizesFrom` steps;
+    synthesis — auto-drafts on first open, using ONLY the student's words from `synthesizesFrom` steps;
                 isArtifact:true → the accepted answer becomes the hub card's final artifact
 
   Optional worksheet fields:
@@ -247,11 +247,11 @@ const MVP_WORKSHEET = {
           type: 'synthesis',
           isArtifact: true,
           title: 'Your real problem statement',
-          prompt: 'Bring it together — this is the write-up you\'ll present when you choose your problem. Line 1: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. Line 2 — TODAY: what those people currently do about it. Line 3 — WHY THAT FAILS: why the workaround isn\'t good enough. Falsifiable, no solution anywhere. Use "Draft from my work" to assemble a starting point from your own words, then make it sharp.',
+          prompt: 'Bring it together — this is the write-up you\'ll present when you choose your problem. Line 1: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. Line 2 — TODAY: what those people currently do about it. Line 3 — WHY THAT FAILS: why the workaround isn\'t good enough. Falsifiable, no solution anywhere. A starting draft is assembled from your own work — make it sharp, and build Line 1 from the statement your hypothesis picked as strongest, not just the first on your list.',
           placeholder: '',
           xp: 30,
           draftWordLimit: 90,
-          synthesizesFrom: ['transform-2', 'problem-hypothesis', 'survey-questions'],
+          synthesizesFrom: ['problem-hypothesis', 'transform-2', 'survey-questions'],
           lessonPanel: {
             point: 'This is the <b>foundation of your whole MVP plan</b> — who has it, how often, what they do now, and why that\'s not good enough. It should make a stranger wince, not nod. If someone could disagree with it, you\'re close.',
             good: 'Student editors struggle to track who\'s writing what because assignments live in DMs, which costs them 2–3 blank pages every issue. TODAY: the editor re-asks everyone weekly. WHY THAT FAILS: people reply late or not at all, so pages stay blank until deadline night.',
@@ -398,7 +398,7 @@ const MVP_WORKSHEET = {
           type: 'synthesis',
           isArtifact: true,
           title: 'Your top user needs',
-          prompt: 'Lock in your final user-needs list: who your user is (one line), their needs ranked by importance with a few words on why #1 is #1, and one line on THE GAP — why what exists today doesn\'t meet need #1. Use "Draft from my work" to start from your own words.',
+          prompt: 'Lock in your final user-needs list: who your user is (one line), their needs ranked by importance with a few words on why #1 is #1, and one line on THE GAP — why what exists today doesn\'t meet need #1. A starting draft is assembled from your own words.',
           placeholder: '',
           xp: 35,
           draftWordLimit: 130,
@@ -505,7 +505,7 @@ const MVP_WORKSHEET = {
           type: 'synthesis',
           isArtifact: true,
           title: 'Your feature list',
-          prompt: 'Write the final feature list for your product: the MUSTs with what each does and which need it serves, then SHOULDs and COULDs as short lines. Use "Draft from my work" to assemble it from your own words.',
+          prompt: 'Write the final feature list for your product: the MUSTs with what each does and which need it serves, then SHOULDs and COULDs as short lines. A starting draft is assembled from your own words.',
           placeholder: '',
           xp: 20,
           draftWordLimit: 130,
@@ -621,7 +621,7 @@ const MVP_WORKSHEET = {
             { title: 'People Skills — Telling It As A Story', url: '#/w/people-skills/s/story-telling', note: 'Before you present this plan: the structure behind persuasive talks, and why the audience is the protagonist rather than you.' },
             { title: 'People Skills — Slide Design', url: '#/w/people-skills/s/slide-design', note: 'Three rules that improve most decks, and a theme you decide once and then reuse.' },
           ],
-          prompt: 'Write the plan you\'ll present and build next semester: the problem (one line), the user, the core need, the 2–3 core features, the first testable version, your first testers, and what success looks like. Use "Draft from my work" to pull it together from everything you\'ve written.',
+          prompt: 'Write the plan you\'ll present and build next semester: the problem (one line), the user, the core need, the 2–3 core features, the first testable version, your first testers, and what success looks like. A starting draft is assembled from everything you\'ve written.',
           placeholder: '',
           xp: 35,
           draftWordLimit: 160,
