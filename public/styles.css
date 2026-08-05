@@ -206,9 +206,9 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 .resources.is-internal{border-color:var(--accent);background:var(--blue-tint)}
 
 /* lesson panel */
-.lesson{margin:20px 0 0;border:2.5px dashed var(--ink);border-radius:var(--radius-sm);background:var(--pad-2);
-  padding:0 16px;max-height:0;overflow:hidden;opacity:0;transition:max-height .4s ease,opacity .3s,padding .4s}
-.lesson.open{max-height:680px;opacity:1;padding:15px 16px}
+.lesson{margin:0;border:0 dashed var(--ink);border-radius:var(--radius-sm);background:var(--pad-2);
+  padding:0 16px;max-height:0;overflow:hidden;opacity:0;transition:max-height .4s ease,opacity .3s,padding .4s,margin .4s,border-width .4s}
+.lesson.open{max-height:680px;opacity:1;padding:15px 16px;margin:20px 0 0;border-width:2.5px}
 .lesson h4{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin:0 0 6px;color:var(--accent-h)}
 .lesson p{margin:0 0 12px;font-size:14px;line-height:1.5}
 .ex{border:2px solid var(--ink);border-radius:var(--radius-sm);padding:9px 12px;margin:0 0 10px;font-size:13.5px;line-height:1.45;box-shadow:var(--shadow-sm)}
