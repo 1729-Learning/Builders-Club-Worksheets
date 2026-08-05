@@ -141,7 +141,7 @@ const MVP_WORKSHEET = {
           rubric: `- Contains THREE distinct problem statements drawn from the student's own listed problems (not new invented ones)
 - Each names a SPECIFIC person or narrow group (not "people", "students", "everyone")
 - Each has a struggle, a root cause, and a concrete consequence/cost
-- Neither contains a solution, product, or app idea
+- None of them contains a solution, product, or app idea
 - Each is falsifiable — a real person could confirm or deny it`,
         },
         {
@@ -206,7 +206,7 @@ const MVP_WORKSHEET = {
         {
           id: 'survey-questions',
           type: 'exercise',
-          reviewerNote: 'This step is a survey red-team. Before judging, ROLE-PLAY a realistic person from the student\'s own problem area (use their prior work to pick who) answering each of the student\'s survey questions in one short line each, exactly as a real person would — including the vague or useless answers that leading questions produce. Put the role-play inside your feedback, clearly formatted, THEN break character and explain what it revealed. Pass only if the questions are non-leading and ask about actual behavior (not opinions or predictions).',
+          reviewerNote: 'This step is a survey red-team. Before judging, ROLE-PLAY a realistic person from the student\'s own problem area (use their prior work to pick who) answering each question in one short line, exactly as a real person would. Answer HONESTLY: a question that works gets a real, useful answer, and you say so. Give a vague or useless answer ONLY where the question genuinely earns it — never manufacture a bad answer to make a point, and never say an option "doesn\'t fit" when it does. Put the role-play inside your feedback, clearly formatted, THEN break character and explain what it revealed. Judge the QUESTIONS, not the wording of the multiple-choice options: as long as the survey question asks for one fact in one tap, the exact answer choices are theirs to pick. Pass if the questions are non-leading and ask about actual behavior (not opinions or predictions).',
           title: 'Build your interview questions',
           buildsOn: ['problem-statement/problem-hypothesis'],
           resources: [

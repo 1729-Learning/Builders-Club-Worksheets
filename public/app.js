@@ -1089,7 +1089,13 @@ async function submitReview(section, step) {
   try {
     const res = await fetch('/api/review', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sectionId: section.id, stepId: step.id, answer: val, attempt: st.attempts, lastFeedback: st.lastFeedback || '' }),
+      body: JSON.stringify({
+        sectionId: section.id, stepId: step.id, answer: val, attempt: st.attempts,
+        lastFeedback: st.lastFeedback || '',
+        // The whole run of notes so far — without it the reviewer can't tell it's
+        // already asked for something, and the bar drifts every round.
+        priorFeedback: st.thread.filter(m => m.role === 'agent' && m.kind !== 'offline').map(m => m.text),
+      }),
     });
     verdict = await res.json();
   } catch {
@@ -1258,6 +1264,7 @@ async function copyPortablePrompt(btn, kind) {
         sectionId: section.id, stepId: step.id, kind: kind || 'review',
         answer: ta ? ta.value.trim() : (st.answer || ''),
         attempt: st.attempts + 1, lastFeedback: st.lastFeedback || '',
+        priorFeedback: st.thread.filter(m => m.role === 'agent' && m.kind !== 'offline').map(m => m.text),
       }),
     });
     prompt = (await res.json()).prompt;

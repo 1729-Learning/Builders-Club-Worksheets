@@ -68,7 +68,7 @@ function backupState() {
   try {
     if (!fs.existsSync(STATE_FILE)) return;
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
-    const files = fs.readdirSync(BACKUP_DIR).filter(f => /^state-.*.json$/.test(f)).sort();
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => /^state-.*\.json$/.test(f)).sort();
     const newest = files[files.length - 1];
     if (newest && Date.now() - fs.statSync(path.join(BACKUP_DIR, newest)).mtimeMs < 5 * 60_000) return;
     fs.copyFileSync(STATE_FILE, path.join(BACKUP_DIR, `state-${new Date().toISOString().replace(/[:.]/g, '-')}.json`));
@@ -89,13 +89,15 @@ function writeState(obj) {
 const PERSONA = `You are "Builders AI," the review coach inside Builders Club, an entrepreneurship program for high-school students (16+). You review worksheet answers against a rubric.
 Rules:
 1. NEVER write or rewrite the answer for the student — hints and questions only.
-2. Be Socratic and specific: name the exact weakness in THEIR words, then ask the one question that would fix it.
+2. Be Socratic and specific: name each weakness in THEIR words. Save your one sharpest question for the end — after you've named everything.
 3. Feedback, not grades — no scores, no letter grades, no percentages.
 4. Teen-friendly, never condescending: short sentences, concrete, warm but not gushing, zero corporate jargon.
 5. Reference the student's own prior work when it helps them connect ideas.
-6. It's fine to pass an imperfect answer that clearly meets the rubric — don't gold-plate.
+6. THE RUBRIC DECIDES PASS/FAIL — nothing else. Pass an imperfect answer that meets it. If you want more polish than the rubric asks for, say so as a suggestion inside a PASSING review; wanting it is never a reason to fail.
 7. Format for skimming — never a wall of text. Open with ONE short sentence, then put each separate point on its own "- " bullet line. No paragraph longer than 2 sentences.
-8. USEFUL beats compliant. The rubric is the floor, not the lesson — always ask "what does this student actually need to hear?" If the real problem is upstream (the idea is far too big to build, it's a solution wearing a problem costume, the premise contradicts their own research), say THAT first and coach them to scale down or slice — do NOT nitpick rubric details on top of a foundation that's wrong. One honest "this is too big — carve out the smallest piece" is worth more than five specifics.`;
+8. USEFUL beats compliant — always ask "what does this student actually need to hear?" If the real problem is upstream (the idea is far too big to build, it's a solution wearing a problem costume, the premise contradicts their own research), LEAD with that instead of rubric details. Leading with it doesn't mean stopping there.
+9. ONE PASS, EVERYTHING — the most important rule when you fail someone. Name every problem you can see, all in this one review. A student who fixes exactly what you named and then hears about a brand-new problem has been failed by you, not by their work. Before you send a failing review, re-read their whole submission and ask: "if they fix ONLY what I have written here, does it pass?" If the answer is no, you are not finished writing.
+10. NEVER invent a fault. If you role-play a user, a builder, or anyone else, answer honestly and stay in the world of what they actually wrote. Check that your objection is actually true of their text before you raise it — never reject an option that in fact fits, or a question that in fact works. A manufactured problem is worse than no feedback at all.`;
 
 const VERDICT_SCHEMA = {
   type: 'object',
@@ -352,14 +354,28 @@ function buildsOnBlock(step, state) {
 }
 
 // The shared middle of every review prompt: step, rubric, prior work, submission.
-function buildReviewBody({ worksheet, section, step, answer, attempt, lastFeedback, state }) {
+function buildReviewBody({ worksheet, section, step, answer, attempt, lastFeedback, priorFeedback, state }) {
   const key = `${section.id}/${step.id}`;
   const roleBlock = step.reviewerNote
     ? `\n## Special instructions for this step\n${step.reviewerNote}\n`
     : '';
 
+  // Every note we've already given them, so the bar can't drift between rounds.
+  const history = (priorFeedback && priorFeedback.length ? priorFeedback : [lastFeedback])
+    .filter(Boolean)
+    .map((t, i) => `Round ${i + 1}: ${clip(t, 600)}`)
+    .join('\n');
+
   const attemptBlock = attempt > 1
-    ? `This is attempt ${attempt}. They revised after your earlier feedback: "${clip(lastFeedback, 300)}"`
+    ? `This is attempt ${attempt} — they have already revised ${attempt - 1} time(s) for you.
+
+### Everything you have already told them on this step
+${history || '(no earlier feedback recorded)'}
+
+### Rules for a repeat review
+- Do NOT raise a point they have already fixed.
+- If you are about to fail them on something that was ALSO true of their earlier submissions and you never mentioned it, that is a miss on your side, not a fresh failure. Name it as something you should have caught earlier — and if the rubric is otherwise met, pass them anyway.
+- Every rubric line met = PASS. After this many rounds, holding out for polish is the wrong call.`
     : 'This is their first attempt.';
 
   return `Review one step of the "${worksheet.title}" worksheet.
@@ -394,7 +410,7 @@ ${body}
 
 You are chatting directly with the student now. Reply as Builders AI:
 1. Open with ONE short sentence: does this meet the rubric yet, or not?
-2. Then 2-4 short "- " bullets, each making one point, using the student's own words.
+2. Then short "- " bullets, each making one point, using the student's own words. If it doesn't pass: 3-5 bullets covering EVERY problem you found — fixing your list must be enough to pass. If you count more than five, don't write a long checklist; name which piece to redo first and why instead. A role-play, if this step has one, doesn't count against the 3-5.
 3. If it doesn't pass yet: end with ONE sharp question, plus one concrete hint (a fill-in-the-blank shape is great).
 4. NEVER write or rewrite the answer for them — coach them until their own revision would pass the rubric. If they paste a new version later in this chat, review it the same way.`;
 }
@@ -442,9 +458,9 @@ ${masteryCandidates(args.state, args.worksheet, key)}
 
 Respond with ONLY a JSON object:
 {"pass": boolean,
- "feedback": "skimmable, never a wall of text: ONE short opening sentence, then 2-4 lines starting with '- ', each making one point in the student's own words. If failing: end with ONE sharp question. If passing: the bullets say what made it work. (the red-team role-play goes here too, if this step has one — each Q/A exchange on its own '- ' line)",
- "reasons": ["3 short bullets; start each with ✓ (met) or ✗ (missed)"],
- "hint": "one concrete nudge — a fill-in-the-blank shape is great — or empty string if passing",
+ "feedback": "skimmable, never a wall of text — a teenager reads this on a phone. ONE short opening sentence, then '- ' bullets in the student's own words. If failing: 3-5 coaching bullets, covering EVERY problem you found, so that fixing this list is enough to pass; then end with ONE sharp question about whichever matters most. If you count MORE than five real problems, do NOT write a ten-item checklist — that many misses means the answer needs a rethink, so spend one or two bullets naming which piece to redo first and why, which is itself the complete instruction. If passing: the bullets say what made it work. (a red-team role-play, if this step has one, goes here too and does NOT count against the 3-5 — keep it to one line per question asked)",
+ "reasons": ["one short bullet per rubric line; start each with ✓ (met) or ✗ (missed)"],
+ "hint": "one concrete nudge toward the most important fix — a fill-in-the-blank shape is great — or empty string if passing",
  "masteryFlags": ["sectionId/stepId"]
 }`;
 }
@@ -540,12 +556,12 @@ const server = http.createServer(async (req, res) => {
 
     // Build the copy-into-any-AI prompt. No AI call — works even when the CLI is offline.
     if (pathname === '/api/prompt' && req.method === 'POST') {
-      const { sectionId, stepId, answer = '', attempt = 1, lastFeedback = '', kind = 'review' } = await readBody(req);
+      const { sectionId, stepId, answer = '', attempt = 1, lastFeedback = '', priorFeedback = [], kind = 'review' } = await readBody(req);
       const found = findStep(sectionId, stepId);
       if (!found) return sendJSON(res, 404, { error: 'unknown step' });
       const prompt = kind === 'practice'
         ? buildPracticePrompt({ ...found, state: readState() })
-        : buildPortablePrompt({ ...found, answer: String(answer), attempt, lastFeedback, state: readState() });
+        : buildPortablePrompt({ ...found, answer: String(answer), attempt, lastFeedback, priorFeedback, state: readState() });
       return sendJSON(res, 200, { prompt });
     }
 
@@ -557,12 +573,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/review' && req.method === 'POST') {
-      const { sectionId, stepId, answer, attempt = 1, lastFeedback = '' } = await readBody(req);
+      const { sectionId, stepId, answer, attempt = 1, lastFeedback = '', priorFeedback = [] } = await readBody(req);
       const found = findStep(sectionId, stepId);
       if (!found) return sendJSON(res, 404, { error: 'unknown step' });
       if (!answer || !String(answer).trim()) return sendJSON(res, 400, { error: 'empty answer' });
       if (!aiAvailable()) return sendJSON(res, 200, offlineVerdict());
-      const prompt = buildReviewPrompt({ ...found, answer: String(answer), attempt, lastFeedback, state: readState() });
+      const prompt = buildReviewPrompt({ ...found, answer: String(answer), attempt, lastFeedback, priorFeedback, state: readState() });
       const verdict = await runVerdict(prompt);
       return sendJSON(res, 200, verdict);
     }
