@@ -1286,13 +1286,20 @@ function redoSection(sectionId) {
   const idx = ws.sections.indexOf(section);
   const laterProgress = ws.sections.slice(idx + 1).some(s2 => s2.steps.some(st => isDone(keyOf(s2, st))));
   const warn = laterProgress ? ' Later sections keep their work but re-lock until this one is finished again.' : '';
-  if (!confirm(`Redo “${section.title}”? This clears all its steps and its artifact.${warn}`)) return;
+  if (!confirm(`Redo “${section.title}”? Every step resets, but your answers stay in their boxes.${warn}`)) return;
 
   for (const step of section.steps) {
     const k = keyOf(section, step);
-    const hadXP = state.steps[k] && state.steps[k].xpAwarded;
-    delete state.steps[k];
-    if (hadXP) state.steps[k] = { status: 'pending', answer: '', attempts: 0, thread: [], xpAwarded: true };
+    const st = state.steps[k];
+    if (!st && !state.mastery[k]) continue;
+    // Reset the PROGRESS, never the words — a redo must not erase student work.
+    // Videos have no words; synthesis steps clear so a fresh draft assembles.
+    const keepAnswer = step.type === 'video' || step.type === 'synthesis' ? '' : (st && st.answer) || '';
+    state.steps[k] = {
+      status: 'pending', answer: keepAnswer, attempts: 0, thread: [],
+      ...(st && st.board ? { board: st.board } : {}),
+      ...(st && st.xpAwarded ? { xpAwarded: true } : {}),
+    };
     delete state.mastery[k];
   }
   delete state.artifacts[section.id];

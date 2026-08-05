@@ -60,8 +60,25 @@ function readState() {
   catch { return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
 }
 
+/* Rolling snapshots of state.json (data/backups/), so a stray "redo" or reset is
+   always undoable: copy the newest state back over data/state.json and restart.
+   At most one snapshot per 5 minutes, newest ~40 kept. Must never break a save. */
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+function backupState() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) return;
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => /^state-.*.json$/.test(f)).sort();
+    const newest = files[files.length - 1];
+    if (newest && Date.now() - fs.statSync(path.join(BACKUP_DIR, newest)).mtimeMs < 5 * 60_000) return;
+    fs.copyFileSync(STATE_FILE, path.join(BACKUP_DIR, `state-${new Date().toISOString().replace(/[:.]/g, '-')}.json`));
+    for (const f of files.slice(0, Math.max(0, files.length - 40))) fs.unlinkSync(path.join(BACKUP_DIR, f));
+  } catch { /* a failed backup must never block the save itself */ }
+}
+
 function writeState(obj) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+  backupState();
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
   fs.renameSync(tmp, STATE_FILE); // atomic — never leaves a half-written state.json
