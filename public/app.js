@@ -460,14 +460,16 @@ function parseListAnswer(s) {
 function listAnswerHTML(step, st, k) {
   const cfg = step.listAnswer;
   const items = parseListAnswer(st.answer);
-  let n = Math.min(cfg.max, Math.max(cfg.min, items.length, listRows.get(k) || 0));
+  // Always start at ONE box — students click + Add to grow toward the required
+  // amount (the req-note says how many), instead of facing a wall of empties.
+  let n = Math.min(cfg.max, Math.max(1, items.length, listRows.get(k) || 0));
   while (items.length < n) items.push('');
   listRows.set(k, items.length);
   const rows = items.map((t, i) => `
     <div class="li-row">
       <span class="li-num">${i + 1}</span>
       <input type="text" class="li-input" data-list="${k}" data-i="${i}" placeholder="${esc(cfg.placeholder || '')}" value="${esc(t)}">
-      ${items.length > cfg.min ? `<button class="li-del" data-listdel="${k}" data-i="${i}" title="Remove this one">✕</button>` : ''}
+      ${items.length > 1 ? `<button class="li-del" data-listdel="${k}" data-i="${i}" title="Remove this one">✕</button>` : ''}
     </div>`).join('');
   return `<div class="list-answer" data-listwrap="${k}">
     ${rows}
@@ -802,8 +804,7 @@ function renderScroll(ws, section) {
       <div class="flow-actions">${section.weeks ? `<span class="wk-chip">🗓 ${esc(section.weeks)}</span>` : ''}${modeBtnHTML()}${sectionRedoBtn(section)}</div>
     </div>
     <section class="hero compact">
-      <span class="kicker">${esc(section.kicker)}</span>
-      <h1>${esc(section.title)}</h1>
+      <h1>${esc(section.kicker)}</h1>
     </section>
     ${steps}`;
 
