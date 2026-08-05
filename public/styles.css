@@ -360,9 +360,8 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .li-add-row:hover .li-add-box{opacity:1;background:#fff}
 /* once ✕ buttons appear beside the real boxes, the ghost row shrinks to stay flush with them */
 .list-answer:has(.li-del) .li-add-row{padding-right:33px}
-/* numbered lists: the breathing room splits evenly — half above the label, half below the add row */
+/* numbered lists sit closer to the prompt — the button row below keeps its normal spacing */
 .answer-wrap:has(.list-answer){margin-top:11px}
-.answer-wrap:has(.list-answer) .answer-tools{margin-top:11px}
 
 /* walkthrough guide checklist */
 .guide{margin:16px 0 0;padding:14px 16px 14px 38px;border:2.5px solid var(--ink);border-radius:var(--radius-sm);
