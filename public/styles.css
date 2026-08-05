@@ -360,8 +360,12 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .li-add-row:hover .li-add-box{opacity:1;background:#fff}
 /* once ✕ buttons appear beside the real boxes, the ghost row shrinks to stay flush with them */
 .list-answer:has(.li-del) .li-add-row{padding-right:33px}
-/* numbered lists sit closer to the prompt — the button row below keeps its normal spacing */
-.answer-wrap:has(.list-answer){margin-top:11px}
+/* numbered lists: 6px above the label and 6px under the ghost row — tight and symmetrical */
+.answer-wrap:has(.list-answer){margin-top:6px}
+.answer-wrap:has(.list-answer) .answer-tools{margin-top:6px}
+/* focus view: list cards hug their content instead of stretching to fill the screen,
+   so spacing matches the scroll view */
+.section.focus:has(.list-answer){min-height:0}
 
 /* walkthrough guide checklist */
 .guide{margin:16px 0 0;padding:14px 16px 14px 38px;border:2.5px solid var(--ink);border-radius:var(--radius-sm);
