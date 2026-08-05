@@ -39,8 +39,8 @@ If that prints `v18` or higher, you're set.
 **Option A — with git:**
 
 ```bash
-git clone https://github.com/1729-Learning/worksheet-demo.git
-cd worksheet-demo
+git clone https://github.com/1729-Learning/Builders-Club-Worksheets.git
+cd Builders-Club-Worksheets
 ```
 
 **Option B — no git:** on the repo page, click the green **Code** button → **Download ZIP**, unzip it, and open a terminal in the unzipped folder (on macOS: right-click the folder → *New Terminal at Folder*).
@@ -101,7 +101,7 @@ claude --version
 
 ## Step 3 — Run it
 
-From the `worksheet-demo` folder:
+From the `Builders-Club-Worksheets` folder:
 
 ```bash
 node server.js
