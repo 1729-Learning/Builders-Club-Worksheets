@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!--
+  Builders Club — MVP Worksheet DEMO (real AI via local `claude -p` server).
+  Run `node server.js` from worksheet-demo/ and open http://localhost:4321
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Semester Worksheets · Builders Club</title>
+<link rel="icon" href="./favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="pad-bg"></div>
+<div class="gearfield" aria-hidden="true">
+  <div class="mg mg-l1" data-gear data-gear-speed="300" data-gear-dir="1"></div>
+  <div class="mg mg-l2" data-gear data-gear-speed="200" data-gear-dir="-1"></div>
+  <div class="mg mg-r1" data-gear data-gear-speed="260" data-gear-dir="-1"></div>
+  <div class="mg mg-r2" data-gear data-gear-speed="380" data-gear-dir="1"></div>
+</div>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#/">
+      <img src="./favicon.svg" alt="Builders Club">
+      <span><span class="wm">Builders Club</span></span>
+    </a>
+    <div class="spacer"></div>
+    <div class="stat"><span class="num" id="secNum">0</span>/<span class="num" id="secDen">8</span> artifacts</div>
+    <div class="stat xp">⚡ <span class="num" id="xpNum">0</span> XP</div>
+    <div class="stat streak">🔥 <span class="num" id="streakNum">0</span> streak</div>
+    <button class="export-btn" data-export>⬇ Builder file</button>
+    <a class="gear-btn" href="#/settings" title="Settings">⚙</a>
+  </div>
+</header>
+
+<main class="sheet" id="view"></main>
+
+<button class="totop" id="toTop" title="Back to top" aria-label="Back to top">↑</button>
+
+<script src="./gears.js"></script>
+<script src="./content.js"></script>
+<script src="./video.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>

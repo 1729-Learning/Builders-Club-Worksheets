@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -50 100 100">
+  <path d="M40.00,0.00L47.70,5.35L46.65,11.29L37.59,13.68L30.64,25.71L33.10,34.76L28.48,38.63L20.00,34.64L6.95,39.39L3.01,47.91L-3.01,47.91L-6.95,39.39L-20.00,34.64L-28.48,38.63L-33.10,34.76L-30.64,25.71L-37.59,13.68L-46.65,11.29L-47.70,5.35L-40.00,0.00L-37.59,-13.68L-42.99,-21.34L-39.98,-26.56L-30.64,-25.71L-20.00,-34.64L-19.22,-43.99L-13.55,-46.05L-6.95,-39.39L6.95,-39.39L13.55,-46.05L19.22,-43.99L20.00,-34.64L30.64,-25.71L39.98,-26.56L42.99,-21.34L37.59,-13.68Z" fill="#4886f3" stroke="#181a1f" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- baseline set so the cap-height (0.716em in Arial Black) is optically centered;
+       dominant-baseline is ignored by some renderers, so don't rely on it -->
+  <text x="0" y="16.5" text-anchor="middle" font-family="Arial Black, Arial Narrow, sans-serif" font-weight="900" font-size="46" fill="#ffffff">B</text>
+</svg>

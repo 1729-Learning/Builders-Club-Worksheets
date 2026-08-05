@@ -1,0 +1,8 @@
+# Runtime data — recreated automatically on first run
+data/
+
+# OS noise
+.DS_Store
+
+# Just in case dependencies ever get added
+node_modules/
