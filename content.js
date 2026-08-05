@@ -60,9 +60,9 @@ const MVP_WORKSHEET = {
           id: 'journal-problems',
           type: 'journal',
           title: 'Problems in my life',
-          prompt: 'List every real problem you bumped into this week — yours or ones you watched someone else have. Small and boring is great. One per line, at least six.',
+          prompt: 'List every real problem you bumped into this week — yours or ones you watched someone else have. Small and boring is great. One per line, at least 10.',
           placeholder: 'Something that wasted my time this week: …\nSomething I watched someone else get stuck on: …',
-          minLines: 6,
+          minLines: 10,
           xp: 15,
           lessonPanel: {
             point: 'This is a <b>journal, not a test</b> — there are no wrong entries. The best problems are the boring ones you almost didn\'t notice. If you saw someone get annoyed, stuck, or waste time this week, that moment belongs on this list.',
@@ -73,10 +73,10 @@ const MVP_WORKSHEET = {
         {
           id: 'pick-top-5',
           type: 'journal',
-          title: 'Pick your top 5 by impact',
-          prompt: 'From your list above, pick the 5 that impact your life (or someone you know) the most. One per line, and add a few words on WHY it makes the cut.',
+          title: 'Pick your top 3 by impact',
+          prompt: 'From your list above, pick the 3 that impact your life (or someone you know) the most. One per line, and add a few words on WHY it makes the cut.',
           placeholder: '1. [problem] — [why it makes the cut: how often · what it costs · why I care]…',
-          minLines: 5,
+          minLines: 3,
           xp: 15,
           lessonPanel: {
             point: 'Impact = how often it happens × how much it costs (time, money, stress) × how much you actually care. A problem you care about survives the whole semester — pick ones you\'d still want to think about in December.',
@@ -101,7 +101,7 @@ const MVP_WORKSHEET = {
           id: 'video-tarpits',
           type: 'video',
           title: 'Beware the tarpit',
-          prompt: 'Check your top 5 against this: some problems LOOK perfect and have quietly swallowed founders for twenty years.',
+          prompt: 'Check your top 3 against this: some problems LOOK perfect and have quietly swallowed founders for twenty years.',
           video: { youtubeId: 'Th8JoIan4dg', start: 186, end: 290 },
           xp: 20,
           videoRecap: [
@@ -113,10 +113,10 @@ const MVP_WORKSHEET = {
         {
           id: 'transform-2',
           type: 'exercise',
-          title: 'Transform 2 problems into problem statements',
+          title: 'Transform 3 problems into problem statements',
           buildsOn: ['problem-statement/pick-top-5'],
           resources: [{ title: 'Paul Graham — How to Get Startup Ideas', url: 'https://paulgraham.com/startupideas.html', note: 'The essay behind this whole section: why "noticing" beats "brainstorming".' }],
-          prompt: 'Take TWO problems from your top 5 (pinned below) and rewrite each as a real problem statement: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. If one refuses to fit the format, that\'s a clue it isn\'t a strong problem — pick another from your list.',
+          prompt: 'Take all THREE problems from your top 3 (pinned below) and rewrite each as a real problem statement: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. If one refuses to fit the format, that\'s a clue it isn\'t a strong problem — rework it rather than force it.',
           placeholder: '[specific person] struggles to [do X] because [root cause], which costs them [consequence]…',
           xp: 30,
           lessonPanel: {
@@ -124,7 +124,7 @@ const MVP_WORKSHEET = {
             good: 'Student tutors struggle to schedule sessions because requests arrive by text, email, and hallway conversations, which costs them about three no-shows a week.',
             bad: 'We should make an app so students save money. <em>(that\'s a pitch — the problem is hidden and a solution is baked in)</em>',
           },
-          rubric: `- Contains TWO distinct problem statements drawn from the student's own listed problems (not new invented ones)
+          rubric: `- Contains THREE distinct problem statements drawn from the student's own listed problems (not new invented ones)
 - Each names a SPECIFIC person or narrow group (not "people", "students", "everyone")
 - Each has a struggle, a root cause ("because…"), and a concrete consequence/cost
 - Neither contains a solution, product, or app idea
@@ -148,7 +148,7 @@ const MVP_WORKSHEET = {
           type: 'exercise',
           title: 'Write your problem hypothesis',
           buildsOn: ['problem-statement/transform-2'],
-          prompt: 'Pick the stronger of your two statements (pinned below) and stretch it into a hypothesis you could test by talking to people: WHO feels this most acutely, HOW OFTEN it happens, WHAT they do about it today, and WHY that isn\'t good enough. You\'re allowed to guess — that\'s what makes it a hypothesis.',
+          prompt: 'Pick the strongest of your three statements (pinned below) and stretch it into a hypothesis you could test by talking to people: WHO feels this most acutely, HOW OFTEN it happens, WHAT they do about it today, and WHY that isn\'t good enough. You\'re allowed to guess — that\'s what makes it a hypothesis.',
           placeholder: 'I believe [who] hits this [how often], currently deals with it by [what], and hates that because…',
           xp: 30,
           masteryHint: 'Skippable if the student\'s problem statements already clearly name who feels the problem most acutely, how often it occurs, and what those people currently do about it.',
