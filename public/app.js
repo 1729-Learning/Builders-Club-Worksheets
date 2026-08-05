@@ -269,7 +269,7 @@ async function renderSettings() {
   view.classList.remove('wide');
   view.innerHTML = `
     <div class="flow-topbar"><a class="crumb" href="#/">◂ Worksheets</a></div>
-    <section class="hero compact"><span class="kicker">SETTINGS</span><h1>Settings</h1></section>
+    <section class="hero compact"><h1>Settings</h1></section>
     <section class="section is-active" id="settings-card"><p class="sec-tagline">Loading…</p></section>`;
   let s = null;
   try { s = await (await fetch('/api/settings', { cache: 'no-store' })).json(); } catch { /* server down */ }

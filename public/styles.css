@@ -80,7 +80,7 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 .hero .kicker,.ws-head .kicker{display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;text-transform:uppercase;
   letter-spacing:.13em;background:var(--yellow);border:2.5px solid var(--ink);border-radius:999px;padding:5px 12px;box-shadow:var(--shadow-sm);transform:rotate(-1.3deg)}
 .ws-head .kicker{background:var(--blue-tint);transform:rotate(-.8deg)}
-.hero h1{font-family:var(--font-display);font-size:clamp(30px,6vw,48px);line-height:.98;margin:18px 0 14px}
+.hero h1{font-family:var(--font-display);font-size:clamp(30px,6vw,48px);line-height:.98;margin:16px 0 10px}
 .hero p{font-size:16px;color:var(--muted);max-width:62ch;margin:0 0 6px;line-height:1.5}
 
 .crumb{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;font-weight:700;
@@ -111,9 +111,9 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 .section.is-mastered .sec-num{background:var(--yellow);color:var(--ink)}
 .sec-headtext{flex:1 1 auto;min-width:0}
 .sec-kicker{font-family:var(--font-mono);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-.sec-title{font-family:var(--font-display);font-size:22px;line-height:1.05;margin:6px 0 0}
+.sec-title{font-family:var(--font-display);font-size:22px;line-height:1.05;margin:3px 0 0}
 .sec-tagline{font-size:14.5px;color:var(--muted);margin:10px 0 0;line-height:1.45}
-.sec-prompt{font-size:15.5px;line-height:1.55;margin:18px 0 0;font-weight:500}
+.sec-prompt{font-size:15.5px;line-height:1.5;margin:14px 0 0;font-weight:500}
 
 .redo-btn{position:absolute;top:14px;right:14px;z-index:3;font-family:var(--font-mono);font-size:10.5px;font-weight:700;
   letter-spacing:.06em;background:var(--coral-tint);color:var(--ink);border:2px solid var(--ink);border-radius:999px;
@@ -217,7 +217,7 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 
 /* answer area */
 .answer-wrap{margin:22px 0 0}
-.field-label{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:9px}
+.field-label{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px}
 textarea.answer{width:100%;min-height:110px;resize:vertical;font-family:var(--font-body);font-size:15px;line-height:1.5;
   color:var(--ink);background:#fff;border:2.5px solid var(--ink);border-radius:var(--radius-sm);padding:11px 13px;outline:none;transition:box-shadow .15s,opacity .3s}
 textarea.answer:focus{box-shadow:var(--shadow-sm)}
