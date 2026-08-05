@@ -323,11 +323,15 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .review-latest .rl-body{display:flex;flex-direction:column;gap:12px}
 
 /* two-sided scoreboard */
-.board{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0 0}
+.board{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0 0;transition:opacity .3s}
+.board.cols-3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:900px){.board.cols-3{grid-template-columns:1fr}}
 @media(max-width:700px){.board{grid-template-columns:1fr}}
+.board.dimmed{opacity:.5;pointer-events:none}
 .board-col{border:2.5px solid var(--ink);border-radius:var(--radius-sm);padding:12px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow-sm)}
-.board-col[data-bdcol="left"]{background:var(--blue-tint)}
-.board-col[data-bdcol="right"]{background:var(--yellow-tint)}
+.board-col[data-tint="0"]{background:var(--blue-tint)}
+.board-col[data-tint="1"]{background:var(--yellow-tint)}
+.board-col[data-tint="2"]{background:var(--coral-tint)}
 .bd-head{display:flex;flex-direction:column;gap:1px;margin-bottom:2px}
 .bd-label{font-family:var(--font-display);font-size:13.5px}
 .bd-hint{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}

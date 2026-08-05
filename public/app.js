@@ -482,53 +482,96 @@ function serializeList(k) {
   stepState(k).answer = vals.join('\n');
 }
 
-/* ---- two-sided scoreboard step ---- */
+/* ---- card-sort boards (two-sided scoreboards + n-column categorize steps) ----
+
+   Two config shapes, one engine:
+     board: { left: {...}, right: {...} }         — the classic two-sided scoreboard
+     board: { columns: [{id, label, hint, placeholder, min?, max?}, …] } — n columns
+   A board WITHOUT a rubric is a keep-adding-forever scoreboard (Save button).
+   A board WITH a rubric is a categorize exercise — it goes through Submit & Review. */
+
+function boardCols(step) {
+  if (step.board.columns) {
+    return step.board.columns.map(c => ({ min: 0, ...c, key: c.id }));
+  }
+  return [
+    { key: 'left', min: step.minPerSide || 1, ...step.board.left },
+    { key: 'right', min: step.minPerSide || 1, ...step.board.right },
+  ];
+}
+
+function ensureBoard(st, cols) {
+  if (!st.board) st.board = {};
+  for (const c of cols) if (!Array.isArray(st.board[c.key])) st.board[c.key] = [''];
+}
 
 function boardAnswerText(step, st) {
-  const fmt = side => st.board[side].map(t => t.trim()).filter(Boolean).map(t => '- ' + t).join('\n');
-  return `${step.board.left.label.toUpperCase()} (${step.board.left.hint}):\n${fmt('left') || '- (none yet)'}\n\n${step.board.right.label.toUpperCase()} (${step.board.right.hint}):\n${fmt('right') || '- (none yet)'}`;
+  const cols = boardCols(step);
+  ensureBoard(st, cols);
+  const fmt = key => st.board[key].map(t => t.trim()).filter(Boolean).map(t => '- ' + t).join('\n');
+  return cols.map(c => `${c.label.toUpperCase()} (${c.hint}):\n${fmt(c.key) || '- (none yet)'}`).join('\n\n');
 }
 
 function serializeBoard(k, step) {
   const st = stepState(k);
+  const cols = boardCols(step);
+  ensureBoard(st, cols);
   const card = document.getElementById('step-' + cssId(k));
   if (!card) return st;
-  for (const side of ['left', 'right']) {
-    const vals = [...card.querySelectorAll(`.bd-card[data-side="${side}"]`)].map(t => t.value);
-    if (vals.length) st.board[side] = vals;
+  for (const c of cols) {
+    const vals = [...card.querySelectorAll(`.bd-card[data-side="${c.key}"]`)].map(t => t.value);
+    if (vals.length) st.board[c.key] = vals;
   }
   st.answer = boardAnswerText(step, st);
   return st;
 }
 
-// The board stays editable forever — done just means "started". Cards keep saving.
+// The board stays editable forever — done just means "started" (scoreboards)
+// or "accepted" (reviewed sorts). Cards keep saving either way.
 function boardHTML(section, step, status) {
   const k = keyOf(section, step);
+  const id = cssId(k);
   const st = stepState(k);
-  if (!st.board) st.board = { left: [''], right: [''] };
+  const cols = boardCols(step);
+  ensureBoard(st, cols);
   const done = status === 'done';
-  const col = side => {
-    const cfg = step.board[side];
-    const cards = st.board[side].map((t, i) => `
+  const reviewed = !!step.rubric;
+  const col = (c, ci) => {
+    const cards = st.board[c.key].map((t, i) => `
       <div class="bd-cardwrap">
-        <textarea class="bd-card" data-board="${k}" data-side="${side}" data-i="${i}" placeholder="${esc(cfg.placeholder || '')}">${esc(t)}</textarea>
-        ${st.board[side].length > 1 ? `<button class="bd-del" data-boarddel="${k}" data-side="${side}" data-i="${i}" title="Remove this card">✕</button>` : ''}
+        <textarea class="bd-card" data-board="${k}" data-side="${c.key}" data-i="${i}" placeholder="${esc(c.placeholder || '')}">${esc(t)}</textarea>
+        ${st.board[c.key].length > 1 ? `<button class="bd-del" data-boarddel="${k}" data-side="${c.key}" data-i="${i}" title="Remove this card">✕</button>` : ''}
       </div>`).join('');
-    return `<div class="board-col" data-bdcol="${side}">
-      <div class="bd-head"><span class="bd-label">${esc(cfg.label)}</span><span class="bd-hint">${esc(cfg.hint)}</span></div>
+    const canAdd = !c.max || st.board[c.key].length < c.max;
+    return `<div class="board-col" data-bdcol="${c.key}" data-tint="${ci % 3}">
+      <div class="bd-head"><span class="bd-label">${esc(c.label)}</span><span class="bd-hint">${esc(c.hint)}</span></div>
       ${cards}
-      <button class="ask-btn bd-add" data-boardadd="${k}" data-side="${side}">+ Add card</button>
+      ${canAdd ? `<button class="ask-btn bd-add" data-boardadd="${k}" data-side="${c.key}">+ Add card</button>` : ''}
     </div>`;
   };
+  const doneLabel = reviewed ? (step.isArtifact ? 'Artifact earned ✓' : 'Step complete ✓') : 'Scoreboard live ✓ — keep adding all semester';
+  const reqNote = step.boardNote ? `<span class="req-note">${esc(step.boardNote)}</span>`
+    : !done ? `<span class="req-note">at least ${step.minPerSide || 1} real moment per side</span>` : '';
+  const actions = reviewed
+    ? `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
+       <button class="ask-btn" data-askopen="${k}">💬 Ask the assistant</button>
+       <button class="btn" data-review="${k}">${st.attempts > 0 ? 'Resubmit ▸' : 'Submit & Review'}</button>
+       ${reqNote}`
+    : `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
+       <button class="btn" data-saveboard="${k}">${done ? 'Save new cards' : 'Save scoreboard'}</button>
+       ${!done ? reqNote : ''}`;
   return `
-    ${done ? `<div class="done-stamp"><span class="big">Scoreboard live ✓ — keep adding all semester</span><span class="xpgain">+${step.xp} XP</span></div>` : ''}
+    ${done && reviewed ? `<button class="redo-btn" data-redostep="${k}" title="Clear this step and do it again">↻ Redo</button>` : ''}
+    ${done ? `<div class="done-stamp"><span class="big">${doneLabel}</span><span class="xpgain">+${step.xp} XP</span></div>` : ''}
+    ${buildsOnHTML(section, step)}
     ${lessonHTML(step, k)}
-    <div class="board">${col('left')}${col('right')}</div>
-    <div class="answer-tools">
-      ${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
-      <button class="btn" data-saveboard="${k}">${done ? 'Save new cards' : 'Save scoreboard'}</button>
-      ${!done ? `<span class="req-note">at least ${step.minPerSide || 1} real moment per side</span>` : ''}
-    </div>`;
+    <div class="board cols-${cols.length}">${cols.map(col).join('')}</div>
+    <div class="answer-tools">${actions}</div>
+    ${reviewed ? `<div class="askbox" id="ask-${id}">
+      <input type="text" placeholder="Ask Builders AI a question about this step…" id="askin-${id}">
+      <button class="ask-btn" data-asksend="${k}">Send</button>
+    </div>` : ''}
+    ${reviewed ? threadHTML(st, k) : ''}`;
 }
 
 function stepBodyHTML(section, step, status) {
@@ -552,7 +595,7 @@ function stepBodyHTML(section, step, status) {
   // Walkthrough checklists (trusted HTML from content.js — links, <code>, <em>).
   const guide = step.guide ? `<ol class="guide">${step.guide.map(g => `<li>${g}</li>`).join('')}</ol>` : '';
 
-  if (step.type === 'board') return boardHTML(section, step, status);
+  if (step.board) return boardHTML(section, step, status); // scoreboards AND reviewed card-sorts
 
   if (status === 'done') {
     const redoBtn = `<button class="redo-btn" data-redostep="${k}" title="Clear this step and do it again">↻ Redo</button>`;
@@ -820,21 +863,34 @@ function completeVideo(section, step) {
 function saveJournal(section, step) {
   const k = keyOf(section, step);
   const st = stepState(k);
-  const ta = document.getElementById('ta-' + cssId(k));
-  const val = ta.value.trim();
-  const lines = val.split('\n').map(l => l.trim()).filter(Boolean);
 
-  if ((step.minLines && lines.length < step.minLines) || (step.minLength && val.length < step.minLength)) {
-    ta.classList.add('shake');
-    setTimeout(() => ta.classList.remove('shake'), 420);
-    ta.focus();
-    return;
+  if (step.listAnswer) {
+    serializeList(k); // writes the current boxes into st.answer, pass or fail
+    const items = parseListAnswer(st.answer).map(t => t.trim()).filter(Boolean);
+    if (items.length < step.listAnswer.min) {
+      const wrap = document.querySelector(`[data-listwrap="${k}"]`);
+      if (wrap) { wrap.classList.add('shake'); setTimeout(() => wrap.classList.remove('shake'), 420); }
+      saveState(true); // too few to accept, but never lose what they've typed
+      return;
+    }
+    st.answer = items.join('\n');
+  } else {
+    const ta = document.getElementById('ta-' + cssId(k));
+    const val = ta.value.trim();
+    const lines = val.split('\n').map(l => l.trim()).filter(Boolean);
+    if ((step.minLines && lines.length < step.minLines) || (step.minLength && val.length < step.minLength)) {
+      ta.classList.add('shake');
+      setTimeout(() => ta.classList.remove('shake'), 420);
+      ta.focus();
+      st.answer = ta.value; saveState(true); // too short to accept, but never lose what they've written
+      return;
+    }
+    st.answer = val;
   }
-  st.answer = val;
   st.status = 'done';
   let gained = step.xp || 15;
   if (step.isArtifact) { // walkthrough artifacts (e.g. the live link) are journal steps
-    state.artifacts[section.id] = val;
+    state.artifacts[section.id] = st.answer;
     gained += section.xp || 0;
   }
   awardStepXP(st, gained);
@@ -845,19 +901,34 @@ function saveJournal(section, step) {
   } else advanceFocus(section);
 }
 
+// Validate every column against its minimum. Shakes the first offender and
+// returns false — after an immediate save, so a failed check never loses cards.
+function boardMeetsMinimums(k, step, st) {
+  const cols = boardCols(step);
+  const count = key => st.board[key].filter(t => t.trim()).length;
+  for (const c of cols) {
+    if (count(c.key) < c.min) {
+      const col = document.querySelector(`#step-${cssId(k)} [data-bdcol="${c.key}"]`);
+      if (col) { col.classList.add('shake'); setTimeout(() => col.classList.remove('shake'), 420); }
+      saveState(true); // too few cards to accept, but serializeBoard already captured them
+      return false;
+    }
+  }
+  if (step.minTotal && cols.reduce((n, c) => n + count(c.key), 0) < step.minTotal) {
+    const board = document.querySelector(`#step-${cssId(k)} .board`);
+    if (board) { board.classList.add('shake'); setTimeout(() => board.classList.remove('shake'), 420); }
+    saveState(true);
+    return false;
+  }
+  return true;
+}
+
 function saveBoard(section, step) {
   const k = keyOf(section, step);
   const st = serializeBoard(k, step);
-  const min = step.minPerSide || 1;
   const wasDone = st.status === 'done';
 
-  for (const side of ['left', 'right']) {
-    if (st.board[side].filter(t => t.trim()).length < min) {
-      const col = document.querySelector(`#step-${cssId(k)} [data-bdcol="${side}"]`);
-      if (col) { col.classList.add('shake'); setTimeout(() => col.classList.remove('shake'), 420); }
-      return;
-    }
-  }
+  if (!boardMeetsMinimums(k, step, st)) return;
   st.status = 'done';
   awardStepXP(st, step.xp || 15);
   saveState(true);
@@ -916,6 +987,11 @@ function setAnswerBusy(k, busy) {
     wrap.classList.toggle('dimmed', busy);
     wrap.querySelectorAll('input,button').forEach(n => { n.disabled = busy; });
   }
+  const board = document.querySelector(`#step-${cssId(k)} .board`);
+  if (board) {
+    board.classList.toggle('dimmed', busy);
+    board.querySelectorAll('textarea,button').forEach(n => { n.disabled = busy; });
+  }
 }
 
 async function submitReview(section, step) {
@@ -926,21 +1002,32 @@ async function submitReview(section, step) {
   const btn = document.querySelector(`[data-review="${k}"]`);
 
   let val;
-  if (step.listAnswer) {
-    serializeList(k);
+  if (step.board) {
+    serializeBoard(k, step); // captures every card into st.board + st.answer, pass or fail
+    if (!boardMeetsMinimums(k, step, st)) return;
+    val = boardAnswerText(step, st);
+  } else if (step.listAnswer) {
+    serializeList(k); // writes the current boxes into st.answer, pass or fail
     const items = parseListAnswer(st.answer).map(t => t.trim()).filter(Boolean);
     if (items.length < step.listAnswer.min) {
       const wrap = document.querySelector(`[data-listwrap="${k}"]`);
       if (wrap) { wrap.classList.add('shake'); setTimeout(() => wrap.classList.remove('shake'), 420); }
+      saveState(true); // too few to submit, but never lose what they've typed
       return;
     }
     val = items.map((t, i) => `${i + 1}. ${t}`).join('\n');
   } else {
     val = ta.value.trim();
-    if (val.length < 3) { ta.classList.add('shake'); setTimeout(() => ta.classList.remove('shake'), 420); ta.focus(); return; }
+    if (val.length < 3) {
+      ta.classList.add('shake'); setTimeout(() => ta.classList.remove('shake'), 420); ta.focus();
+      st.answer = ta.value; saveState(true); // too short to submit, but never lose what they've typed
+      return;
+    }
   }
 
-  st.answer = step.listAnswer ? parseListAnswer(st.answer).map(t => t.trim()).filter(Boolean).join('\n') : val;
+  st.answer = step.board ? val
+    : step.listAnswer ? parseListAnswer(st.answer).map(t => t.trim()).filter(Boolean).join('\n')
+    : val;
   st.attempts += 1;
   setAnswerBusy(k, true);
   btn.disabled = true;
@@ -1000,7 +1087,7 @@ async function submitReview(section, step) {
     setAnswerBusy(k, false);
     btn.disabled = false; btn.textContent = 'Resubmit ▸';
     if (ta) ta.focus();
-    saveState();
+    saveState(true); // rejected — never advance, but the attempt + feedback thread are never lost
   }
 }
 
@@ -1373,13 +1460,15 @@ function wire() {
     const sb = e.target.closest('[data-saveboard]');
     if (sb) { const { section, step } = findByKey(sb.dataset.saveboard); saveBoard(section, step); return; }
 
+    // Adding/removing boxes and cards saves IMMEDIATELY — half-finished work
+    // survives a closed laptop even if it was never submitted or accepted.
     const ba = e.target.closest('[data-boardadd]');
     if (ba) {
       const k = ba.dataset.boardadd;
       const { step } = findByKey(k);
       const st = serializeBoard(k, step);
       st.board[ba.dataset.side].push('');
-      saveState();
+      saveState(true);
       route();
       return;
     }
@@ -1391,7 +1480,7 @@ function wire() {
       const st = serializeBoard(k, step);
       st.board[bd.dataset.side].splice(parseInt(bd.dataset.i, 10), 1);
       st.answer = boardAnswerText(step, st);
-      saveState();
+      saveState(true);
       route();
       return;
     }
@@ -1401,7 +1490,7 @@ function wire() {
       const k = la.dataset.listadd;
       serializeList(k);
       listRows.set(k, (listRows.get(k) || 0) + 1);
-      saveState();
+      saveState(true);
       route();
       return;
     }
@@ -1414,7 +1503,7 @@ function wire() {
       vals.splice(parseInt(ld.dataset.i, 10), 1);
       stepState(k).answer = vals.join('\n');
       listRows.set(k, vals.length);
-      saveState();
+      saveState(true);
       route();
       return;
     }
@@ -1470,6 +1559,28 @@ function wire() {
     if (e.key === 'Enter' && e.target.matches('.askbox input')) {
       const btn = e.target.closest('.askbox').querySelector('[data-asksend]');
       if (btn) btn.click();
+      return;
+    }
+    // Enter in a list box: save immediately, then hop to the next box —
+    // adding a fresh one if they're on the last box and under the max.
+    if (e.key === 'Enter' && e.target.matches('.li-input')) {
+      e.preventDefault();
+      const k = e.target.dataset.list;
+      const i = parseInt(e.target.dataset.i, 10);
+      serializeList(k);
+      saveState(true);
+      const wrap = document.querySelector(`[data-listwrap="${k}"]`);
+      const inputs = wrap ? [...wrap.querySelectorAll('.li-input')] : [];
+      if (i + 1 < inputs.length) { inputs[i + 1].focus(); return; }
+      const add = wrap && wrap.querySelector('[data-listadd]');
+      if (add) {
+        add.click(); // serializes + saves + re-renders
+        requestAnimationFrame(() => {
+          const w2 = document.querySelector(`[data-listwrap="${k}"]`);
+          const ins = w2 ? w2.querySelectorAll('.li-input') : [];
+          if (ins.length) ins[ins.length - 1].focus();
+        });
+      }
     }
   });
 
