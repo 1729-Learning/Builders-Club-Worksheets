@@ -1315,6 +1315,9 @@ function redoStep(k) {
   delete st.verdict;
   delete st.lastFeedback;
   if (step.type === 'video') { delete st.maxWatched; delete st.watchedSeconds; st.answer = ''; }
+  // Redoing a synthesis step means "assemble me a fresh draft from my current work" —
+  // clear the old draft and the once-only flag so the auto-draft fires again.
+  if (step.type === 'synthesis') { delete st.autoDrafted; st.answer = ''; }
   if (step.isArtifact) delete state.artifacts[section.id];
   focusView.set(section.id, section.steps.indexOf(step));
   saveState(true);
