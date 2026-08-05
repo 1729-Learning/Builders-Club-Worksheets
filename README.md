@@ -39,7 +39,7 @@ If that prints `v18` or higher, you're set.
 **Option A — with git:**
 
 ```bash
-git clone https://github.com/adv129/worksheet-demo.git
+git clone https://github.com/1729-Learning/worksheet-demo.git
 cd worksheet-demo
 ```
 
