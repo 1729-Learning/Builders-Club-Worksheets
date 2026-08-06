@@ -381,9 +381,12 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 /* backup card: two half-width pills over a full-width restore bar */
 .backup-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
 .backup-row .btn{flex:1 1 0;min-width:200px;border-radius:999px}
-.backup-restore{display:block;width:100%;margin-top:10px;font-family:var(--font-display);font-size:13px;
+.backup-restore{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;
+  font-family:var(--font-display);font-size:14px;line-height:14px;
   background:var(--pad-2);color:var(--ink);border:2.5px solid var(--ink);border-radius:var(--radius-sm);
-  padding:12px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .12s,box-shadow .12s}
+  padding:9px 16px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .12s,box-shadow .12s}
+/* oversized glyph, zero line box — the icon can't stretch the button past the pills */
+.backup-restore .br-icon{font-size:21px;line-height:0;font-weight:700}
 .backup-restore:hover{transform:translate(-1px,-1px);box-shadow:var(--shadow-h);background:#fff}
 
 /* class-week chip: which weeks of the semester a section belongs to */
@@ -403,18 +406,25 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .totop.show{opacity:1;pointer-events:auto;transform:none}
 .totop:hover{transform:translateY(-2px);box-shadow:var(--shadow-h)}
 
-/* worksheet blocks on the home page */
+/* worksheet blocks on the home page — <details>, so the whole worksheet folds
+   away to just its title and description. Open by default; see closedBlocks. */
 .ws-block{margin:0 0 14px}
-.ws-head{margin:44px 0 20px;border-top:3px dashed var(--hair);padding-top:30px}
-.ws-block:first-of-type .ws-head{border-top:none;padding-top:0;margin-top:24px}
-.ws-title{font-family:var(--font-display);font-size:clamp(22px,4vw,32px);line-height:1.05;margin:12px 0 6px}
+.ws-head{margin:44px 0 20px;border-top:3px dashed var(--hair);padding-top:30px;
+  cursor:pointer;list-style:none}
+.ws-head::-webkit-details-marker{display:none}
+.ws-block.is-first .ws-head{border-top:none;padding-top:0;margin-top:24px}
+.ws-title{font-family:var(--font-display);font-size:clamp(22px,4vw,32px);line-height:1.05;margin:12px 0 6px;
+  display:flex;align-items:center;gap:12px}
+.ws-chev{flex:none;font-size:.62em;line-height:1;color:var(--muted);transition:transform .18s ease}
+.ws-block[open] .ws-chev{transform:rotate(180deg)}
+.ws-head:hover .ws-chev{color:var(--ink)}
 .ws-sub{font-size:14.5px;color:var(--muted);margin:0;line-height:1.5}
 .ws-count{font-family:var(--font-mono);font-size:11px;font-weight:700;white-space:nowrap;margin-left:8px}
 
 /* extras — bonus worksheets, collapsed into a dropdown each */
 .ws-fold{margin:14px 0 0;background:var(--surface);border:3px solid var(--ink);
   border-radius:var(--radius);box-shadow:var(--shadow)}
-.ws-fold:first-of-type{margin-top:44px}
+.ws-fold.is-first{margin-top:44px}
 .wf-head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;
   list-style:none;border-radius:11px}
 .wf-head::-webkit-details-marker{display:none}

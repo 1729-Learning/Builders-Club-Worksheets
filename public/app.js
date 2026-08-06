@@ -189,7 +189,8 @@ function route() {
   if (m) {
     const ws = WORKSHEETS.find(w => w.id === m[1]);
     if (ws) {
-      if (ws.extra) setFold(ws.id, true); // coming back from an extras section: don't land on a closed drawer
+      // Coming back from a section: don't land on a closed drawer, either kind.
+      if (ws.extra) setFold(ws.id, true); else setBlockClosed(ws.id, false);
       renderHome();
       const el = document.getElementById('ws-' + ws.id);
       if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
@@ -260,20 +261,28 @@ function setFold(id, open) {
   localStorage.setItem('bc.folds', JSON.stringify([...openFolds]));
 }
 
+/* Core worksheets are open by default — assigned work shouldn't hide itself — so
+   we remember the CLOSED ones, the inverse of how extras track their folds. */
+const closedBlocks = new Set(JSON.parse(localStorage.getItem('bc.blocksClosed') || '[]'));
+function setBlockClosed(id, closed) {
+  if (closed) closedBlocks.add(id); else closedBlocks.delete(id);
+  localStorage.setItem('bc.blocksClosed', JSON.stringify([...closedBlocks]));
+}
+
 // One big page: every worksheet with all of its section cards.
 function renderHome() {
   const view = $('#view');
   view.classList.remove('wide');
 
-  const block = w => {
+  const block = (w, i) => {
     const done = w.sections.filter(sectionDone).length;
     const allDone = done === w.sections.length;
     return `
-    <div class="ws-block" id="ws-${w.id}">
-      <div class="ws-head">
-        <h2 class="ws-title">${esc(w.title)}</h2>
+    <details class="ws-block${i === 0 ? ' is-first' : ''}" id="ws-${w.id}" data-block="${w.id}"${closedBlocks.has(w.id) ? '' : ' open'}>
+      <summary class="ws-head">
+        <h2 class="ws-title">${esc(w.title)}<span class="ws-chev" aria-hidden="true">▾</span></h2>
         <p class="ws-sub">${esc(w.subtitle || '')} <span class="ws-count">${done}/${w.sections.length} artifacts</span></p>
-      </div>
+      </summary>
       ${allDone ? `
       <section class="section is-done finale">
         <div class="trophy">🏆</div>
@@ -282,15 +291,15 @@ function renderHome() {
         <div class="answer-tools" style="justify-content:center"><button class="btn green" data-export>Download Builder File ⬇</button></div>
       </section>` : ''}
       ${w.sections.map((s, i) => sectionCardHTML(w, s, i)).join('')}
-    </div>`;
+    </details>`;
   };
 
   // Extras collapse into a dropdown each — they shouldn't cost the student a
   // screen of scrolling on the way to the work that's actually assigned.
-  const fold = w => {
+  const fold = (w, i) => {
     const done = w.sections.filter(sectionDone).length;
     return `
-    <details class="ws-fold" id="ws-${w.id}" data-fold="${w.id}"${openFolds.has(w.id) ? ' open' : ''}>
+    <details class="ws-fold${i === 0 ? ' is-first' : ''}" id="ws-${w.id}" data-fold="${w.id}"${openFolds.has(w.id) ? ' open' : ''}>
       <summary class="wf-head">
         <span class="wf-badge">EXTRA</span>
         <span class="wf-title">${esc(w.title)}</span>
@@ -303,6 +312,7 @@ function renderHome() {
 
   const core = WORKSHEETS.filter(w => !w.extra).map(block).join('');
   const extras = WORKSHEETS.filter(w => w.extra).map(fold).join('');
+
 
   view.innerHTML = `
     <section class="hero">
@@ -348,7 +358,7 @@ function dataCardHTML() {
       <button class="btn white" data-importmd>⬆ Upload Builder file</button>
       <input type="file" id="importFile" accept=".md,text/markdown" style="display:none">
     </div>
-    <button class="backup-restore" data-showbackups>↺ Restore a backup</button>
+    <button class="backup-restore" data-showbackups><span class="br-icon">↺</span>Restore a backup</button>
     <div id="backupList"></div>
   </section>`;
 }
@@ -1526,10 +1536,13 @@ function findByKey(k) {
 }
 
 function wire() {
-  // <details> fires toggle, not click — remember which extras are expanded.
+  // <details> fires toggle, not click — remember which drawers the student left open.
   document.addEventListener('toggle', e => {
-    const f = e.target.closest && e.target.closest('[data-fold]');
+    if (!e.target.closest) return;
+    const f = e.target.closest('[data-fold]');
     if (f) setFold(f.dataset.fold, f.open);
+    const b = e.target.closest('[data-block]');
+    if (b) setBlockClosed(b.dataset.block, !b.open);
   }, true);
 
   document.addEventListener('click', e => {
