@@ -378,6 +378,14 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 /* practice-interview call to action */
 .practice-copy{display:block;margin:0 0 14px}
 
+/* backup card: two half-width pills over a full-width restore bar */
+.backup-row{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.backup-row .btn{flex:1 1 0;min-width:200px;border-radius:999px}
+.backup-restore{display:block;width:100%;margin-top:10px;font-family:var(--font-display);font-size:13px;
+  background:var(--pad-2);color:var(--ink);border:2.5px solid var(--ink);border-radius:var(--radius-sm);
+  padding:12px;cursor:pointer;box-shadow:var(--shadow-sm);transition:transform .12s,box-shadow .12s}
+.backup-restore:hover{transform:translate(-1px,-1px);box-shadow:var(--shadow-h);background:#fff}
+
 /* class-week chip: which weeks of the semester a section belongs to */
 .wk-chip{font-family:var(--font-mono);font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
   border:2px solid var(--ink);border-radius:999px;padding:4px 10px;background:var(--yellow-tint);

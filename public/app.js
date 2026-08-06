@@ -340,18 +340,15 @@ function dataCardHTML() {
   return `
   <section class="section is-active">
     <div class="sec-headtext">
-      <div class="sec-kicker">YOUR DATA</div>
-      <h2 class="sec-title">Your Builder file</h2>
+      <div class="sec-kicker">BACKUP</div>
+      <h2 class="sec-title">Manage your data</h2>
     </div>
-    <p class="sec-tagline">The complete record of everything earned. Download it to submit it or keep it safe; upload one to bring that work onto this machine.</p>
-    <div class="answer-tools">
+    <div class="backup-row">
       <button class="btn" data-export>⬇ Download Builder file</button>
-      <button class="ask-btn" data-importmd>⬆ Upload Builder file</button>
+      <button class="btn white" data-importmd>⬆ Upload Builder file</button>
       <input type="file" id="importFile" accept=".md,text/markdown" style="display:none">
     </div>
-    <div class="answer-tools" style="margin-top:10px">
-      <button class="ask-btn" data-showbackups>Restore a backup</button>
-    </div>
+    <button class="backup-restore" data-showbackups>Restore a backup</button>
     <div id="backupList"></div>
   </section>`;
 }
