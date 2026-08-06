@@ -439,6 +439,7 @@ function parseBuilderFile(text) {
           }
           ensureBoard(st, cols);
         }
+        if (step.fields) st.fields = fieldsFromAnswer(step, st.answer); // rebuild the boxes from their serialized text
         s.steps[k] = st;
       }
     }
@@ -741,6 +742,85 @@ function sizeRecapBoxes() {
   });
 }
 
+/* ---- multi-box answers (step.fields) ------------------------------------
+
+   fields: [{ id, label, placeholder?, prefill?, minLines? }, …] — one labelled
+   textarea per entry instead of a single answer box. A `prefill` seeds the box
+   with a template the student edits in place (blanks to replace), so it has to
+   be real text, not a placeholder. st.fields holds the boxes; st.answer stays
+   the single serialized string everything else already reads (review prompt,
+   buildsOn digests, artifacts, the Builder file). */
+
+function fieldsAnswerText(step, st) {
+  return step.fields
+    .map(f => `${f.label.toUpperCase()}:\n${(st.fields[f.id] || '').trim()}`)
+    .join('\n\n');
+}
+
+// Split a serialized answer back into boxes. Anything before the first header
+// (an older single-box answer, a hand-edited Builder file) lands in box one.
+function fieldsFromAnswer(step, answer) {
+  const out = {};
+  let cur = step.fields[0].id;
+  for (const line of String(answer || '').split('\n')) {
+    const f = step.fields.find(x => line.toUpperCase().trim() === x.label.toUpperCase() + ':');
+    if (f) { cur = f.id; out[cur] = out[cur] || ''; continue; }
+    out[cur] = out[cur] === undefined ? line : out[cur] + '\n' + line;
+  }
+  for (const f of step.fields) out[f.id] = (out[f.id] || '').trim();
+  return out;
+}
+
+function ensureFields(st, step) {
+  if (!st.fields) {
+    st.fields = (st.answer || '').trim()
+      ? fieldsFromAnswer(step, st.answer)
+      : Object.fromEntries(step.fields.map(f => [f.id, f.prefill || '']));
+    st.answer = fieldsAnswerText(step, st);
+  }
+  for (const f of step.fields) if (typeof st.fields[f.id] !== 'string') st.fields[f.id] = f.prefill || '';
+  return st;
+}
+
+function serializeFields(k, step) {
+  const st = stepState(k);
+  ensureFields(st, step);
+  const card = document.getElementById('step-' + cssId(k));
+  if (card) {
+    for (const f of step.fields) {
+      const ta = card.querySelector(`.answer[data-field="${f.id}"][data-fieldstep="${k}"]`);
+      if (ta) st.fields[f.id] = ta.value;
+    }
+  }
+  st.answer = fieldsAnswerText(step, st);
+  return st;
+}
+
+function fieldsHTML(step, st, k) {
+  ensureFields(st, step);
+  return step.fields.map((f, i) => `
+    <div class="field-box${i ? ' stacked' : ''}">
+      <label class="field-label" for="ta-${cssId(k)}-${f.id}">${esc(f.label)}</label>
+      <textarea class="answer" id="ta-${cssId(k)}-${f.id}" data-field="${f.id}" data-fieldstep="${k}"
+        placeholder="${esc(f.placeholder || '')}">${esc(st.fields[f.id] || '')}</textarea>
+    </div>`).join('');
+}
+
+// Shakes the first box that's short of its own minimum. Returns false after an
+// immediate save, so a failed check never loses what they typed.
+function fieldsMeetMinimums(k, step, st) {
+  for (const f of step.fields) {
+    const lines = (st.fields[f.id] || '').split('\n').map(l => l.trim()).filter(Boolean);
+    if (f.minLines && lines.length < f.minLines) {
+      const ta = document.querySelector(`.answer[data-field="${f.id}"][data-fieldstep="${k}"]`);
+      if (ta) { ta.classList.add('shake'); setTimeout(() => ta.classList.remove('shake'), 420); ta.focus(); }
+      saveState(true);
+      return false;
+    }
+  }
+  return true;
+}
+
 /* ---- card-sort boards (two-sided scoreboards + n-column categorize steps) ----
 
    Two config shapes, one engine:
@@ -887,9 +967,11 @@ function stepBodyHTML(section, step, status) {
     : isJournal && step.minLines ? `<span class="req-note">at least ${step.minLines} lines</span>` : '';
   const fieldLabel = cfg ? `Your ${esc((cfg.itemLabel || 'item').toLowerCase())}s` : 'Your answer';
 
-  const answerField = cfg
-    ? listAnswerHTML(step, st, k)
-    : `<textarea class="answer" id="ta-${id}" data-draft="${k}" placeholder="${esc(step.placeholder || 'Write your answer here…')}">${esc(st.answer || '')}</textarea>`;
+  const answerField = step.fields
+    ? fieldsHTML(step, st, k)
+    : cfg
+      ? listAnswerHTML(step, st, k)
+      : `<textarea class="answer" id="ta-${id}" data-draft="${k}" placeholder="${esc(step.placeholder || 'Write your answer here…')}">${esc(st.answer || '')}</textarea>`;
 
   return `
     ${buildsOnHTML(section, step)}
@@ -897,7 +979,7 @@ function stepBodyHTML(section, step, status) {
     ${lessonHTML(step, k)}
     <div class="answer-wrap">
       ${step.practice ? `<button class="btn practice-copy" data-copypractice="${k}">🎙 Copy the practice-interview setup</button>` : ''}
-      <label class="field-label" for="ta-${id}">${fieldLabel}</label>
+      ${step.fields ? '' : `<label class="field-label" for="ta-${id}">${fieldLabel}</label>`}
       ${answerField}
       <div class="answer-tools">
         ${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
@@ -1004,7 +1086,7 @@ function renderFocus(ws, section) {
           <h2 class="sec-title">${esc(step.title)}</h2>
         </div>
       </div>
-      ${status !== 'locked' ? `<p class="sec-prompt">${esc(step.prompt)}</p>` : ''}
+      ${status !== 'locked' ? `<p class="sec-prompt">${mdInline(step.prompt)}</p>` : ''}
       ${stepBodyHTML(section, step, status)}
     </section>
     <div class="focus-nav">
@@ -1041,7 +1123,7 @@ function renderScroll(ws, section) {
           <h2 class="sec-title">${esc(step.title)}</h2>
         </div>
       </div>
-      ${status !== 'locked' ? `<p class="sec-prompt">${esc(step.prompt)}</p>` : ''}
+      ${status !== 'locked' ? `<p class="sec-prompt">${mdInline(step.prompt)}</p>` : ''}
       ${stepBodyHTML(section, step, status)}
     </section>`;
   }).join('');
@@ -1241,6 +1323,9 @@ function setAnswerBusy(k, busy) {
     board.classList.toggle('dimmed', busy);
     board.querySelectorAll('textarea,button').forEach(n => { n.disabled = busy; });
   }
+  document.querySelectorAll(`.answer[data-fieldstep="${k}"]`).forEach(n => {
+    n.disabled = busy; n.classList.toggle('dimmed', busy);
+  });
 }
 
 async function submitReview(section, step) {
@@ -1251,7 +1336,11 @@ async function submitReview(section, step) {
   const btn = document.querySelector(`[data-review="${k}"]`);
 
   let val;
-  if (step.board) {
+  if (step.fields) {
+    serializeFields(k, step); // captures every box into st.fields + st.answer, pass or fail
+    if (!fieldsMeetMinimums(k, step, st)) return;
+    val = st.answer;
+  } else if (step.board) {
     serializeBoard(k, step); // captures every card into st.board + st.answer, pass or fail
     if (!boardMeetsMinimums(k, step, st)) return;
     val = boardAnswerText(step, st);
@@ -1506,6 +1595,7 @@ function redoSection(sectionId) {
     state.steps[k] = {
       status: 'pending', answer: keepAnswer, attempts: 0, thread: [],
       ...(st && st.board ? { board: st.board } : {}),
+      ...(st && st.fields ? { fields: st.fields } : {}),
       ...(st && st.xpAwarded ? { xpAwarded: true } : {}),
     };
     delete state.mastery[k];
@@ -1780,6 +1870,14 @@ function wire() {
   document.addEventListener('input', e => {
     const ta = e.target.closest('[data-draft]');
     if (ta) { stepState(ta.dataset.draft).answer = ta.value; saveState(); return; }
+
+    const fb = e.target.closest('.answer[data-fieldstep]');
+    if (fb) {
+      const k = fb.dataset.fieldstep;
+      serializeFields(k, findByKey(k).step);
+      saveState();
+      return;
+    }
 
     const li = e.target.closest('.li-input');
     if (li) {

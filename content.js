@@ -3,6 +3,8 @@
   Single source of truth for BOTH the browser (rendering) and the server (rubrics).
   Adding a worksheet, section, or step = adding config here, not code.
 
+  A step's `prompt` renders **bold** and `code` (markdown-lite, escaped first).
+
   Step types:
     journal   — personal-input elicitation; local validation only (minLines/minLength), no AI call
     video     — gated YouTube segment {youtubeId, start, end} (seconds); videoRecap shown on completion
@@ -26,6 +28,11 @@
     buildsOn:  ['sectionId/stepId', …] — earlier work this step builds on. Pinned above the
                answer box in the UI and handed to the reviewer. Keys are globally unique, so
                cross-worksheet references work.
+    fields:    [{ id, label, placeholder?, prefill?, minLines? }, …] — split the answer into
+               several labelled boxes instead of one. `prefill` seeds a box with an editable
+               template (brackets for the student to replace), so it must be real text rather
+               than a placeholder. The boxes serialize into the same single answer string, so
+               rubrics, buildsOn digests, artifacts, and the Builder file are unaffected.
     resources: [{ title, url, note }] — curated reading ("Go deeper"), max 2 external per step.
                A url starting with '#' is an internal link into another worksheet
                (e.g. '#/w/people-skills/s/story-telling') and renders as its own
@@ -247,7 +254,7 @@ const MVP_WORKSHEET = {
           type: 'synthesis',
           isArtifact: true,
           title: 'Your real problem statement',
-          prompt: 'Bring it together — this is the write-up you\'ll present when you choose your problem. Line 1: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. Line 2 — TODAY: what those people currently do about it. Line 3 — WHY THAT FAILS: why the workaround isn\'t good enough. Falsifiable, no solution anywhere. A starting draft is assembled from your own work — make it sharp, and build Line 1 from the statement your hypothesis picked as strongest, not just the first on your list.',
+          prompt: 'Bring it together — this is the write-up you\'ll present when you choose your problem. Line 1: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. Line 2 — TODAY: what those people currently do about it. Line 3 — WHY THAT FAILS: why the workaround isn\'t good enough. Falsifiable, no solution anywhere. A starting draft is assembled from your own work — **rewrite this in your own words and add in missing details.**',
           placeholder: '',
           xp: 30,
           draftWordLimit: 90,
@@ -299,8 +306,20 @@ const MVP_WORKSHEET = {
           title: 'Plan your outreach',
           buildsOn: ['problem-statement/survey-questions'],
           resources: [{ title: 'People Skills — The Networking Call', url: '#/w/people-skills/s/networking-call', note: 'A professional interviewer\'s five rules for the call itself, and how to phrase an ask someone can say yes to.' }],
-          prompt: 'Time to actually reach people. Name THREE real, reachable people or places in your problem area you\'ll contact first (names, teams, servers, forums — specific), then write the actual outreach message you\'ll send, in this shape: who you are → one line on what you\'re researching → a small ask (15–20 minutes), no pitching. Your interview questions are pinned below — this message is how they get used.',
-          placeholder: '1. [name] — [why they\'re the right person to ask]…\n\nMessage: "Hi [name] — I\'m [you], and I\'m researching [topic]…"',
+          prompt: 'Time to actually reach people. First box: THREE real, reachable people or places in your problem area you\'ll contact first (names, teams, servers, forums — specific), one per line, with why them. Second box: the message you\'ll actually send — **the shape is pre-filled, so replace every bracket with your own words.** No pitching. Your interview questions are pinned below — this message is how they get used.',
+          fields: [
+            {
+              id: 'people',
+              label: 'Who you\'ll contact first',
+              placeholder: '1. [name, team, server, or forum] — [why they\'re the right person to ask]',
+              minLines: 3,
+            },
+            {
+              id: 'message',
+              label: 'The message you\'ll send',
+              prefill: 'Hi [their name],\n\nI\'m [your name] — [one line: your school, club, or team].\n\n[Why I\'m asking YOU specifically — what you saw them do, run, or post.]\n\nI\'m researching [the problem area, in plain words]. I\'m not selling anything and I have nothing to show you — I just want to hear how it actually goes for you.\n\nCould I ask you about [the experience you want to hear about]? 20 minutes, whenever is easy.\n\nThanks,\n[your name]',
+            },
+          ],
           xp: 30,
           lessonPanel: {
             point: 'Outreach fails from <b>pitching</b>, not from asking. You\'re not selling anything yet — you\'re a person curious about their experience. Short beats clever, specific beats broad, and naming why you\'re asking THEM beats any template.',
