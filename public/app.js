@@ -164,6 +164,13 @@ let activeGates = []; // live YouTube gates, destroyed on every re-render (free 
 let lastRouteHash = null; // navigating to a NEW route always starts at the top of the page
 
 function route() {
+  renderRoute();
+  // Every render rebuilds these from scratch, so re-fit them to their text.
+  sizeListBoxes();
+  sizeRecapBoxes();
+}
+
+function renderRoute() {
   activeGates.forEach(g => g.destroy());
   activeGates = [];
   const h = location.hash || '#/';
@@ -668,7 +675,7 @@ function listAnswerHTML(step, st, k) {
   const rows = items.map((t, i) => `
     <div class="li-row">
       <span class="li-num">${i + 1}</span>
-      <input type="text" class="li-input" data-list="${k}" data-i="${i}" placeholder="${esc(cfg.placeholder || '')}" value="${esc(t)}">
+      <textarea class="li-input" rows="1" data-list="${k}" data-i="${i}" placeholder="${esc(cfg.placeholder || '')}">${esc(t)}</textarea>
       ${items.length > 1 ? `<button class="li-del" data-listdel="${k}" data-i="${i}" title="Remove this one">✕</button>` : ''}
     </div>`).join('');
   return `<div class="list-answer" data-listwrap="${k}">
@@ -682,6 +689,56 @@ function serializeList(k) {
   if (!wrap) return;
   const vals = [...wrap.querySelectorAll('.li-input')].map(i => i.value);
   stepState(k).answer = vals.join('\n');
+}
+
+/* Grow a textarea to fit its own text. Collapse to 0 first so scrollHeight
+   reports the true content height and the box can shrink again on delete;
+   scrollHeight excludes borders under border-box, so add them back. */
+function autoGrow(ta) {
+  const cs = getComputedStyle(ta);
+  const border = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+  ta.style.height = '0px';
+  ta.style.height = (ta.scrollHeight + border) + 'px';
+}
+
+/* Re-fit every list box on screen, and watch each list for width changes:
+   a narrower column rewraps the text into more lines, and because the boxes
+   hide their overflow a stale height would clip the last line outright.
+   Only WIDTH matters — reacting to height would loop, since we set it. */
+let listWidths = new WeakMap();
+const listObserver = window.ResizeObserver ? new ResizeObserver(entries => {
+  for (const en of entries) {
+    const w = en.contentRect.width;
+    if (listWidths.get(en.target) === w) continue;
+    listWidths.set(en.target, w);
+    en.target.querySelectorAll('.li-input').forEach(autoGrow);
+  }
+}) : null;
+
+function sizeListBoxes() {
+  document.querySelectorAll('.li-input').forEach(autoGrow);
+  if (!listObserver) return;
+  // Every render throws the old boxes away, so re-point the observer.
+  listObserver.disconnect();
+  listWidths = new WeakMap();
+  document.querySelectorAll('.list-answer').forEach(w => listObserver.observe(w));
+}
+
+/* "Building on" recap cards hug a short answer and cap a long one, which then
+   scrolls. The cap is an inline height rather than a CSS max-height: max-height
+   would also clamp the resize handle, so a student couldn't drag the card taller
+   to read the whole thing. Only run on render — re-running would snap a card
+   the student had dragged open back down to the cap. */
+const RECAP_CAP = 120;
+function sizeRecapBoxes() {
+  document.querySelectorAll('.bo-text').forEach(box => {
+    box.style.height = '';                 // measure the text unconstrained
+    const natural = box.scrollHeight;
+    const capped = natural > RECAP_CAP;
+    // only a capped card is hiding anything, so only it gets the drag handle
+    box.classList.toggle('is-capped', capped);
+    box.style.height = (capped ? RECAP_CAP : natural) + 'px';
+  });
 }
 
 /* ---- card-sort boards (two-sided scoreboards + n-column categorize steps) ----
@@ -1725,7 +1782,15 @@ function wire() {
     if (ta) { stepState(ta.dataset.draft).answer = ta.value; saveState(); return; }
 
     const li = e.target.closest('.li-input');
-    if (li) { serializeList(li.dataset.list); saveState(); return; }
+    if (li) {
+      // One box = one line of the saved answer, so a pasted newline would split
+      // the item in two. Flatten it into a space and let the box grow instead.
+      if (li.value.includes('\n')) li.value = li.value.replace(/\s*\n\s*/g, ' ');
+      autoGrow(li);
+      serializeList(li.dataset.list);
+      saveState();
+      return;
+    }
 
     const bc = e.target.closest('.bd-card');
     if (bc) {
@@ -1747,6 +1812,15 @@ function wire() {
       toTop.classList.toggle('show', window.scrollY > 600);
     }, { passive: true });
     toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  }
+
+  // Browsers without ResizeObserver fall back to re-fitting on window resize.
+  if (!listObserver) {
+    let sizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(sizeTimer);
+      sizeTimer = setTimeout(sizeListBoxes, 120);
+    });
   }
 
   document.addEventListener('keydown', e => {
@@ -1806,6 +1880,9 @@ async function boot() {
 
   wire();
   route();
+  // The web fonts land after the first render and change how the text wraps,
+  // so measure again once they're in.
+  if (document.fonts) document.fonts.ready.then(() => { sizeListBoxes(); sizeRecapBoxes(); });
 }
 
 boot();
