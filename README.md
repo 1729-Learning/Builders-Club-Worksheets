@@ -135,9 +135,9 @@ Click the **⚙ gear** in the top-right of the app. The Settings page shows whic
 
 ![Settings page — choosing between Codex and Claude Code](docs/screenshots/settings.png)
 
-- **Auto** (default) — uses Codex when installed (it's much faster), otherwise Claude Code.
 - **Codex** — about 15s per review.
 - **Claude Code** — about 60s per review.
+- Until you pick one, it uses Codex when installed (it's much faster), otherwise Claude Code.
 
 Settings also controls **progression**: *Guided* (sections unlock in order — the default classroom experience) vs *Free roam* (everything unlocked, any order).
 

@@ -513,10 +513,11 @@ function settingsCardHTML(s) {
     ? `<span class="chip ok">installed ✓</span>`
     : `<span class="chip warn">not installed</span>`;
   const opts = [
-    { v: 'auto', title: 'Auto', desc: 'Use Codex when it’s installed (it’s much faster), otherwise Claude Code.', chip: '<span class="chip">recommended</span>' },
     { v: 'codex', title: 'Codex', desc: 'OpenAI’s agent CLI — uses the ChatGPT account signed in on this machine. About 15s per review.', chip: status(s.engines.codex) },
     { v: 'claude', title: 'Claude Code', desc: 'Anthropic’s agent CLI — uses the Claude account signed in on this machine. About 60s per review.', chip: status(s.engines.claude) },
   ];
+  // Machines that saved the old 'auto' setting show whichever engine auto resolved to.
+  const sel = s.reviewBackend === 'auto' ? s.active : s.reviewBackend;
   const activeName = s.active === 'codex' ? 'Codex' : 'Claude Code';
   return `
     <div class="sec-headtext">
@@ -525,8 +526,8 @@ function settingsCardHTML(s) {
     </div>
     <div class="opt-list">
       ${opts.map(o => `
-      <button class="opt ${s.reviewBackend === o.v ? 'sel' : ''}" data-backend="${o.v}">
-        <span class="opt-radio">${s.reviewBackend === o.v ? '●' : ''}</span>
+      <button class="opt ${sel === o.v ? 'sel' : ''}" data-backend="${o.v}">
+        <span class="opt-radio">${sel === o.v ? '●' : ''}</span>
         <span class="opt-main">
           <span class="opt-title">${o.title}</span>
           <span class="opt-desc">${o.desc}</span>
