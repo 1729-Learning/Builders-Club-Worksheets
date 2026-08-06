@@ -334,46 +334,139 @@ async function renderSettings() {
   updateHeader();
 }
 
-/* Export & restore: the Builder file is the readable portfolio; the JSON backup
-   is an exact snapshot of state.json for moving machines or undoing disasters. */
+/* The Builder file is BOTH the submission and the manual fallback: download it to
+   hand in or keep safe, upload one to restore that work onto this machine. */
 function dataCardHTML() {
   return `
   <section class="section is-active">
     <div class="sec-headtext">
       <div class="sec-kicker">YOUR DATA</div>
-      <h2 class="sec-title">Export & restore</h2>
+      <h2 class="sec-title">Your Builder file</h2>
     </div>
-    <p class="sec-tagline">The Builder file is the readable record of everything earned — the one to hand to a mentor. The backup is an exact snapshot of all progress on this machine; restoring one replaces everything with it.</p>
+    <p class="sec-tagline">The complete record of everything earned. Download it to submit it or keep it safe; upload one to bring that work onto this machine.</p>
     <div class="answer-tools">
-      <button class="btn" data-export>⬇ Builder file (.md)</button>
-      <button class="ask-btn" data-exportstate>⬇ Backup progress (.json)</button>
-      <button class="ask-btn" data-importstate>⬆ Restore from backup…</button>
-      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+      <button class="btn" data-export>⬇ Download Builder file</button>
+      <button class="ask-btn" data-importmd>⬆ Upload Builder file…</button>
+      <input type="file" id="importFile" accept=".md,text/markdown" style="display:none">
     </div>
+    <div class="answer-tools" style="margin-top:10px">
+      <button class="ask-btn" data-showbackups>⏪ Restore an automatic backup…</button>
+      <span class="req-note">a snapshot is kept every time a step is completed or submitted</span>
+    </div>
+    <div id="backupList"></div>
   </section>`;
 }
 
-function exportProgressBackup() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `builders-progress-${todayStr()}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+/* The server snapshots state right before every completed / submitted / redone
+   step (data/backups/). This lists recent ones so any accident is a 2-click undo. */
+async function showBackupList() {
+  const box = document.getElementById('backupList');
+  if (!box) return;
+  let list = [];
+  try { list = (await (await fetch('/api/backups', { cache: 'no-store' })).json()).backups || []; } catch { /* server down */ }
+  if (!list.length) {
+    box.innerHTML = '<p class="sec-tagline">No automatic backups yet — they appear as soon as steps get completed or submitted.</p>';
+    return;
+  }
+  box.innerHTML = `<div class="opt-list">${list.map(b => `
+    <button class="opt" data-restorebackup="${esc(b.file)}">
+      <span class="opt-main">
+        <span class="opt-title">${esc(new Date(b.ts).toLocaleString())}</span>
+        <span class="opt-desc">${b.done} completed step${b.done === 1 ? '' : 's'} · ${b.xp} XP</span>
+      </span>
+    </button>`).join('')}</div>`;
 }
 
-async function importProgressBackup(input) {
+async function restoreBackup(file, label) {
+  if (!confirm(`Roll everything on this machine back to the snapshot from ${label}? Today's progress is snapshotted first, so this can itself be undone.`)) return;
+  try {
+    const r = await (await fetch('/api/backups/restore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file }),
+    })).json();
+    if (!r.ok) throw new Error('restore failed');
+  } catch {
+    alert('Couldn’t restore that backup — is the server still running?');
+    return;
+  }
+  location.hash = '#/';
+  location.reload();
+}
+
+/* Rebuild state from an exported Builder file. Matches worksheets, sections, and
+   steps by TITLE — the same titles the export writes. What a Builder file never
+   contains (in-progress answers, AI feedback threads) can't come back from one. */
+function parseBuilderFile(text) {
+  const lines = String(text).split(/\r?\n/);
+  if (!/^# Builders Club — Builder File/.test(lines[0] || '')) return null;
+  const s = { meta: { version: 1, updatedAt: Date.now() }, xp: 0, streak: 0, lastActiveDay: '', steps: {}, artifacts: {}, mastery: {} };
+  const head = lines.find(l => l.startsWith('_Exported'));
+  const hm = head && head.match(/·\s*(\d+)\s*XP\s*·\s*(\d+)-day/);
+  if (hm) { s.xp = +hm[1]; s.streak = +hm[2]; }
+
+  let ws = null, section = null, step = null, buf = [], attempts = 0, mastered = null, watched = false;
+
+  const flush = () => {
+    if (section && step) {
+      const k = keyOf(section, step);
+      if (mastered !== null) {
+        s.mastery[k] = { reason: mastered, ts: Date.now() };
+      } else {
+        while (buf.length && !buf[buf.length - 1].trim()) buf.pop();
+        while (buf.length && !buf[0].trim()) buf.shift();
+        const st = { status: 'done', answer: watched ? '' : buf.join('\n'), attempts, thread: [], xpAwarded: true };
+        if (attempts > 0) st.verdict = { pass: true, ts: Date.now() };
+        if (step.board) { // rebuild the card columns from their serialized text
+          const cols = boardCols(step);
+          st.board = {};
+          let cur = null;
+          for (const line of st.answer.split('\n')) {
+            const col = cols.find(c => line.toUpperCase().startsWith(c.label.toUpperCase() + ' ('));
+            if (col) { cur = col.key; st.board[cur] = []; continue; }
+            if (cur && line.startsWith('- ') && line !== '- (none yet)') st.board[cur].push(line.slice(2));
+          }
+          ensureBoard(st, cols);
+        }
+        s.steps[k] = st;
+      }
+    }
+    step = null; buf = []; attempts = 0; mastered = null; watched = false;
+  };
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    let m;
+    if ((m = line.match(/^### (.+)/))) { flush(); step = section ? section.steps.find(x => x.title === m[1]) || null : null; continue; }
+    if ((m = line.match(/^## (\d+)\. (.+)/))) { flush(); section = ws ? ws.sections.find(x => x.title === m[2]) || null : null; continue; }
+    if ((m = line.match(/^# (.+)/))) { flush(); ws = WORKSHEETS.find(w => w.title === m[1]) || null; section = null; continue; }
+    if (!step && section && line.startsWith('> **')) { // the section's artifact blockquote
+      const quoted = [];
+      let j = i + 1;
+      while (j < lines.length && lines[j].startsWith('>')) { quoted.push(lines[j].replace(/^> ?/, '')); j++; }
+      while (quoted.length && !quoted[0].trim()) quoted.shift();
+      s.artifacts[section.id] = quoted.join('\n').trim();
+      i = j - 1;
+      continue;
+    }
+    if (!step) continue;
+    if (/^\*\*Task:\*\*/.test(line)) continue;
+    if (/^_Watched segment /.test(line)) { watched = true; continue; }
+    if ((m = line.match(/^_Mastered — skipped\. (.*)_$/))) { mastered = m[1]; continue; }
+    if ((m = line.match(/^_Accepted by Builders AI after (\d+) attempt/))) { attempts = +m[1]; continue; }
+    buf.push(line);
+  }
+  flush();
+  return s;
+}
+
+async function importBuilderFile(input) {
   const file = input.files && input.files[0];
   input.value = ''; // allow picking the same file again later
   if (!file) return;
-  let data;
-  try { data = JSON.parse(await file.text()); } catch { data = null; }
-  if (!data || typeof data !== 'object' || !data.steps || typeof data.steps !== 'object') {
-    alert('That file isn’t a progress backup — pick the .json file exported from this page.');
-    return;
-  }
-  const n = Object.values(data.steps).filter(st => st && st.status === 'done').length;
-  if (!confirm(`Restore this backup? It holds ${n} completed step${n === 1 ? '' : 's'} and ${data.xp || 0} XP. Everything currently on this machine will be replaced by it.`)) return;
+  const data = parseBuilderFile(await file.text());
+  if (!data) { alert('That doesn’t look like a Builder file — pick the .md file downloaded from this page.'); return; }
+  const n = Object.values(data.steps).filter(st => st.status === 'done').length;
+  if (!n && !Object.keys(data.mastery).length) { alert('No completed steps found in that Builder file.'); return; }
+  if (!confirm(`Restore from this Builder file? It holds ${n} completed step${n === 1 ? '' : 's'} and ${data.xp} XP. Everything currently on this machine will be replaced by it.`)) return;
   state = data;
   await saveState(true);
   location.hash = '#/';
@@ -1513,11 +1606,18 @@ function wire() {
     const exp = e.target.closest('[data-export]');
     if (exp) { exportBuilderFile(); return; }
 
-    const exs = e.target.closest('[data-exportstate]');
-    if (exs) { exportProgressBackup(); return; }
-
-    const ims = e.target.closest('[data-importstate]');
+    const ims = e.target.closest('[data-importmd]');
     if (ims) { const inp = document.getElementById('importFile'); if (inp) inp.click(); return; }
+
+    const shb = e.target.closest('[data-showbackups]');
+    if (shb) { showBackupList(); return; }
+
+    const rsb = e.target.closest('[data-restorebackup]');
+    if (rsb) {
+      const label = (rsb.querySelector('.opt-title') || rsb).textContent.trim();
+      restoreBackup(rsb.dataset.restorebackup, label);
+      return;
+    }
 
     const lesson = e.target.closest('[data-lesson]');
     if (lesson) {
@@ -1606,9 +1706,9 @@ function wire() {
     if (unm) { delete state.mastery[unm.dataset.unmaster]; saveState(true); route(); return; }
   });
 
-  // The hidden file input on the Settings page (restore from backup).
+  // The hidden file input on the Settings page (upload a Builder file).
   document.addEventListener('change', e => {
-    if (e.target && e.target.id === 'importFile') importProgressBackup(e.target);
+    if (e.target && e.target.id === 'importFile') importBuilderFile(e.target);
   });
 
   // Persist drafts as they type — plain answers, list rows, and board cards.

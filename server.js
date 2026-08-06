@@ -60,25 +60,33 @@ function readState() {
   catch { return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
 }
 
-/* Rolling snapshots of state.json (data/backups/), so a stray "redo" or reset is
-   always undoable: copy the newest state back over data/state.json and restart.
-   At most one snapshot per 5 minutes, newest ~40 kept. Must never break a save. */
+/* Snapshots of state.json (data/backups/), taken the moment BEFORE any meaningful
+   change lands — a step completed, submitted, redone, mastered, or an artifact
+   earned/removed. Typing doesn't count, so every snapshot marks a real event and
+   any accident can be rolled back to just before it happened. Newest 100 kept. */
 const BACKUP_DIR = path.join(DATA_DIR, 'backups');
-function backupState() {
+function stateSignature(s) {
+  const steps = s.steps || {};
+  return JSON.stringify([
+    Object.keys(steps).sort().map(k => [k, steps[k].status, steps[k].attempts]),
+    Object.keys(s.mastery || {}).sort(),
+    Object.keys(s.artifacts || {}).sort(),
+  ]);
+}
+function backupState(next) {
   try {
     if (!fs.existsSync(STATE_FILE)) return;
+    if (stateSignature(readState()) === stateSignature(next)) return; // just typing — not an event
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
-    const files = fs.readdirSync(BACKUP_DIR).filter(f => /^state-.*\.json$/.test(f)).sort();
-    const newest = files[files.length - 1];
-    if (newest && Date.now() - fs.statSync(path.join(BACKUP_DIR, newest)).mtimeMs < 5 * 60_000) return;
     fs.copyFileSync(STATE_FILE, path.join(BACKUP_DIR, `state-${new Date().toISOString().replace(/[:.]/g, '-')}.json`));
-    for (const f of files.slice(0, Math.max(0, files.length - 40))) fs.unlinkSync(path.join(BACKUP_DIR, f));
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => /^state-.*\.json$/.test(f)).sort();
+    for (const f of files.slice(0, Math.max(0, files.length - 100))) fs.unlinkSync(path.join(BACKUP_DIR, f));
   } catch { /* a failed backup must never block the save itself */ }
 }
 
 function writeState(obj) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  backupState();
+  backupState(obj);
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
   fs.renameSync(tmp, STATE_FILE); // atomic — never leaves a half-written state.json
@@ -528,6 +536,32 @@ function serveStatic(req, res) {
 const server = http.createServer(async (req, res) => {
   try {
     const { pathname } = new URL(req.url, 'http://x');
+
+    if (pathname === '/api/backups' && req.method === 'GET') {
+      let backups = [];
+      try {
+        backups = fs.readdirSync(BACKUP_DIR).filter(f => /^state-[\w-]+\.json$/.test(f)).sort().reverse().slice(0, 15).map(f => {
+          let done = 0, xp = 0;
+          try {
+            const s = JSON.parse(fs.readFileSync(path.join(BACKUP_DIR, f), 'utf8'));
+            done = Object.values(s.steps || {}).filter(st => st && st.status === 'done').length;
+            xp = s.xp || 0;
+          } catch { /* unreadable snapshot still gets listed */ }
+          return { file: f, ts: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs, done, xp };
+        });
+      } catch { /* no backups dir yet */ }
+      return sendJSON(res, 200, { backups });
+    }
+
+    if (pathname === '/api/backups/restore' && req.method === 'POST') {
+      const { file } = await readBody(req);
+      if (!/^state-[\w-]+\.json$/.test(String(file || ''))) return sendJSON(res, 400, { error: 'bad file' });
+      const src = path.join(BACKUP_DIR, file);
+      if (!fs.existsSync(src)) return sendJSON(res, 404, { error: 'not found' });
+      const restored = JSON.parse(fs.readFileSync(src, 'utf8'));
+      writeState(restored); // snapshots the current state first — so a restore is itself undoable
+      return sendJSON(res, 200, { ok: true });
+    }
 
     if (pathname === '/api/state' && req.method === 'GET') return sendJSON(res, 200, readState());
 
