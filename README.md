@@ -1,13 +1,11 @@
 # Builders Club — Semester Worksheets
 
-Interactive semester worksheets for Builders Club, with **real AI review** built in. Students work through scaffolded chains of journals, gated video segments, and exercises; each worksheet builds toward final artifacts they earn along the way:
+Interactive semester worksheets for Builders Club, with **AI review** built in. Students work through scaffolded chains of journals, gated video segments, and exercises; each worksheet builds on top of the previous ones allowing for a cohesive experience.
 
-- **Build Your MVP Plan** — problem statement → user needs & market gap → features → MVP plan
-- **Work With AI** — when to use AI → context & the email assistant → specs → shipping safely
 
 ![Worksheet hub](docs/screenshots/hub.png)
 
-The AI feedback is not canned — every submission is reviewed against the step's rubric by a real model, running through an agent CLI already installed and logged in on your machine: **Codex** (OpenAI) or **Claude Code** (Anthropic). That means:
+Every submission is reviewed against the step's rubric by **Codex** (OpenAI) or **Claude Code** (Anthropic). That means:
 
 - **No API keys.** No `.env` files, no keys to buy or rotate.
 - **No accounts to create.** It reuses the ChatGPT or Claude login you already have.
@@ -50,16 +48,14 @@ Worksheets get fixed and added to during the semester, and a cloned folder can u
 
 On macOS, run `git --version` once and the system offers to install the Command Line Tools for you. Otherwise get it from [git-scm.com](https://git-scm.com).
 
-If you truly can't use git, the ZIP works for running the worksheets: green **Code** button → **Download ZIP**, unzip, and open a terminal in the unzipped folder (on macOS: right-click the folder → *New Terminal at Folder*). Just know that updating later means downloading a fresh ZIP and copying your `data/` folder into it.
 </details>
 
 ---
 
 ## Step 2 — Set up an AI reviewer
 
-Pick one (or do both — the app auto-detects what's installed).
 
-### Option A: Codex (recommended — ~4× faster per review)
+### Option A: Codex
 
 Codex is OpenAI's agent CLI. It signs in with a regular **ChatGPT account** (Plus/Pro/Team). Docs: [developers.openai.com/codex/cli](https://developers.openai.com/codex/cli)
 
@@ -103,8 +99,6 @@ claude
 claude --version
 ```
 
-> **Tip:** installing both is genuinely useful — reviews fail over gracefully, and you can compare feedback quality between engines from the Settings page without touching a terminal.
-
 ---
 
 ## Step 3 — Run it
@@ -125,19 +119,19 @@ node server.js
 
 Either way, open **http://localhost:4321** in your browser.
 
-The startup log tells you which reviewer it found and which one it's using. If no CLI is detected, the app still runs — AI reviews just show a friendly "reviewer is offline" notice until you finish Step 2.
+The startup log tells you which reviewer it found and which one it's using. If no CLI is detected, the app still runs — AI reviews just show a "reviewer is offline" notice until you finish Step 2.
 
 ---
 
 ## Step 4 — Choose your review engine
 
-Click the **⚙ gear** in the top-right of the app. The Settings page shows which engines are installed and lets you switch instantly — no restart needed. Your choice persists in `data/settings.json`.
+Click the **⚙ gear** in the top-right of the app. The Settings page shows which engines are installed and lets you switch. Your choice persists in `data/settings.json`.
 
 ![Settings page — choosing between Codex and Claude Code](docs/screenshots/settings.png)
 
-- **Codex** — about 15s per review.
-- **Claude Code** — about 60s per review.
-- Until you pick one, it uses Codex when installed (it's much faster), otherwise Claude Code.
+- **Codex** — tested to be slightly faster.
+- **Claude Code** — gives better feedback sometimes.
+- Until you pick one, it uses Codex when installed, otherwise Claude Code.
 
 Settings also controls **progression**: *Guided* (sections unlock in order — the default classroom experience) vs *Free roam* (everything unlocked, any order).
 
@@ -147,10 +141,10 @@ Settings also controls **progression**: *Guided* (sections unlock in order — t
 
 ![A worksheet step with a gated video segment](docs/screenshots/step.png)
 
-- **Video steps** play a specific segment and gate progress on actually watching it.
-- **Exercise steps** are reviewed by the AI against that step's rubric — Socratic hints and questions only, never rewritten answers, never grades.
+- **Video steps** plays a segment of a YouTube video thats been picked for its quality.
+- **Exercise steps** are reviewed by the AI against that step's rubric. The goal is to iterate towards a good response, not to get graded or rush towards completion.
 - **Journal steps** are private reflections; the AI can reference them later to connect ideas.
-- Finished sections mint **artifacts** — the tangible outputs (problem statement, MVP plan, …) that carry into next semester.
+- Finished sections mint **artifacts** — the tangible outputs (problem statement, MVP plan, …).
 
 Progress, XP, and streaks live in `data/state.json`. Delete that file to reset everything to a fresh student.
 
@@ -158,11 +152,7 @@ Progress, XP, and streaks live in `data/state.json`. Delete that file to reset e
 
 ## Getting updates
 
-Worksheets get corrected, expanded, and re-cut during the semester. To pick up the latest version:
-
-**Double-click `Update Worksheets.command`.** That's it.
-
-It tells you what changed, and if the worksheets are running it restarts them so the update actually takes effect. Then double-click `Start Worksheets.command` and carry on.
+**Double-click `Update Worksheets.command`.** 
 
 **Your work is never at risk.** Everything you've written — answers, artifacts, XP, streak — lives in the `data/` folder, which git ignores completely. Updating only replaces the worksheet files themselves. There is nothing to back up and nothing to migrate.
 
@@ -172,14 +162,14 @@ You can also do it by hand if you prefer:
 git pull --rebase --autostash
 ```
 
-Then restart the server. **The restart matters:** the server loads the rubrics once at boot, so a running copy keeps reviewing against the old ones until you restart it. `Update Worksheets.command` handles that for you.
+Then **restart the server.**
 
 <details>
 <summary>Instructor note — editing content while students are mid-worksheet</summary>
 
-Progress is keyed by **id** (`"sectionId/stepId"`), stored separately from content, so most edits land safely on a student who's halfway through. Free to change any time: prompts, placeholders, rubrics, lesson panels, reviewer notes, titles, videos and their timestamps, week chips, `buildsOn`, resources — plus adding steps, sections or whole worksheets, and reordering steps.
+Progress is denoted by **id** (`"sectionId/stepId"`), stored separately from content, so most edits land safely on a student who's halfway through. Free to change any time: prompts, placeholders, rubrics, lesson panels, reviewer notes, titles, videos and their timestamps, week chips, `buildsOn`, resources — plus adding steps, sections or whole worksheets, and reordering steps.
 
-Three edits orphan saved work, so avoid them once a cohort has started:
+There are only 3 edits to look out for that cause issues with student work:
 
 1. **Renaming a step or section `id`.** The answer stays in `state.json` but nothing looks for it, and the step reads as untouched. Change titles freely; treat ids as permanent. (`pick-top-5` keeps that id even though it now says "top 3" — that's the pattern.)
 2. **Deleting a step or section** that students have answered.
@@ -190,7 +180,6 @@ Three edits orphan saved work, so avoid them once a cohort has started:
 
 ## Configuration reference
 
-All optional — the defaults just work.
 
 | Env var | Default | What it does |
 |---|---|---|
