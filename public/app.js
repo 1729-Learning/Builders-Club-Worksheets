@@ -346,12 +346,11 @@ function dataCardHTML() {
     <p class="sec-tagline">The complete record of everything earned. Download it to submit it or keep it safe; upload one to bring that work onto this machine.</p>
     <div class="answer-tools">
       <button class="btn" data-export>⬇ Download Builder file</button>
-      <button class="ask-btn" data-importmd>⬆ Upload Builder file…</button>
+      <button class="ask-btn" data-importmd>⬆ Upload Builder file</button>
       <input type="file" id="importFile" accept=".md,text/markdown" style="display:none">
     </div>
     <div class="answer-tools" style="margin-top:10px">
-      <button class="ask-btn" data-showbackups>⏪ Restore an automatic backup…</button>
-      <span class="req-note">a snapshot is kept every time a step is completed or submitted</span>
+      <button class="ask-btn" data-showbackups>Restore a backup</button>
     </div>
     <div id="backupList"></div>
   </section>`;
