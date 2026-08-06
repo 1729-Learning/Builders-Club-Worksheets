@@ -348,7 +348,7 @@ function dataCardHTML() {
       <button class="btn white" data-importmd>⬆ Upload Builder file</button>
       <input type="file" id="importFile" accept=".md,text/markdown" style="display:none">
     </div>
-    <button class="backup-restore" data-showbackups>Restore a backup</button>
+    <button class="backup-restore" data-showbackups>↺ Restore a backup</button>
     <div id="backupList"></div>
   </section>`;
 }
@@ -518,7 +518,6 @@ function settingsCardHTML(s) {
   ];
   // Machines that saved the old 'auto' setting show whichever engine auto resolved to.
   const sel = s.reviewBackend === 'auto' ? s.active : s.reviewBackend;
-  const activeName = s.active === 'codex' ? 'Codex' : 'Claude Code';
   return `
     <div class="sec-headtext">
       <div class="sec-kicker">AI REVIEWER</div>
@@ -534,8 +533,7 @@ function settingsCardHTML(s) {
         </span>
         ${o.chip}
       </button>`).join('')}
-    </div>
-    <p class="active-note">Reviews are running on: <b>${activeName}</b>${s.activeAvailable ? '' : ' — ⚠ not installed, so reviews will show an offline notice'}</p>`;
+    </div>`;
 }
 
 /* ---------------------------------------------------------------- flow view */
