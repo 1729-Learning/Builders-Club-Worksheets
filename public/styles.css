@@ -367,6 +367,12 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
    so spacing matches the scroll view */
 .section.focus:has(.list-answer){min-height:0}
 
+/* multi-box answers (step.fields): each box keeps its own label, and the second
+   one sits a title-to-prompt gap below the first instead of touching it */
+.field-box.stacked{margin-top:18px}
+/* focus view: two stacked boxes share the height instead of one filling the screen */
+.section.focus .field-box textarea.answer{min-height:150px}
+
 /* walkthrough guide checklist */
 .guide{margin:16px 0 0;padding:14px 16px 14px 38px;border:2.5px solid var(--ink);border-radius:var(--radius-sm);
   background:var(--pad-2);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:9px}
