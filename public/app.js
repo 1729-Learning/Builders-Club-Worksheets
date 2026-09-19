@@ -1,4 +1,5 @@
-/* Builders Club — MVP Worksheet demo app: hash router, hub/flow views, real AI review. */
+/* Builders Club — semester worksheets: hash router, hub/flow views, AI review.
+   Per-student, behind a school Microsoft sign-in. */
 'use strict';
 
 /* ---------------------------------------------------------------- utils */
@@ -81,6 +82,34 @@ function roams(section) {
   return !!(ws && ws.freeRoam);
 }
 
+/* ---------------------------------------------------------------- session */
+
+let me = null;          // { name, email, role } once signed in
+
+/* Every call goes through here so an expired sign-in is handled in one place.
+   A 401 raises the banner and throws — it never redirects and never re-renders,
+   because a student mid-answer must not lose what they have typed. */
+class AuthError extends Error {
+  constructor() { super('unauthenticated'); this.name = 'AuthError'; }
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, Object.assign({ cache: 'no-store' }, opts));
+  if (res.status === 401) { showAuthBanner(); throw new AuthError(); }
+  hideAuthBanner();
+  return res;
+}
+
+function showAuthBanner() {
+  const b = document.getElementById('authBanner');
+  if (b) b.hidden = false;
+}
+
+function hideAuthBanner() {
+  const b = document.getElementById('authBanner');
+  if (b) b.hidden = true;
+}
+
 /* ---------------------------------------------------------------- state */
 
 let state = null;
@@ -88,12 +117,24 @@ let saveTimer = null;
 let appSettings = { freeRoam: false }; // refreshed from /api/settings at boot and on settings changes
 
 function saveState(immediate) {
+  if (viewingAs) return Promise.resolve(); // an instructor reading a student's work never writes to it
   clearTimeout(saveTimer);
-  const doSave = () => fetch('/api/state', {
+  saveTimer = null;
+  const doSave = () => api('/api/state', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
   }).catch(() => {});
   if (immediate) return doSave();
   saveTimer = setTimeout(doSave, 500);
+}
+
+/* Write out anything the 500ms debounce is still holding. Called before the
+   page starts showing someone else's work: a timer that fired afterwards would
+   post whatever `state` points at by then — the wrong person's answers. */
+function flushPendingSave() {
+  if (!saveTimer) return Promise.resolve();
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  return saveState(true);
 }
 
 function keyOf(section, step) { return section.id + '/' + step.id; }
@@ -168,6 +209,9 @@ function route() {
   // Every render rebuilds these from scratch, so re-fit them to their text.
   sizeListBoxes();
   sizeRecapBoxes();
+  // readOnly (not disabled) keeps the text selectable and copyable while
+  // stopping the input events that would otherwise write to the student's work.
+  if (viewingAs) document.querySelectorAll('#view textarea').forEach(t => { t.readOnly = true; });
 }
 
 function renderRoute() {
@@ -178,7 +222,18 @@ function renderRoute() {
   lastRouteHash = h;
   const startAtTop = () => { if (newRoute) window.scrollTo({ top: 0, behavior: 'instant' }); };
 
-  if (h.startsWith('#/settings')) { renderSettings(); startAtTop(); return; }
+  if (h.startsWith('#/instructor')) {
+    if (!me || me.role !== 'instructor') { location.hash = '#/'; return; }
+    const m2 = h.match(/^#\/instructor\/([\w-]+)/);
+    if (m2) { enterViewingAs(m2[1]); return; }
+    leaveViewingAs();
+    renderRoster();
+    startAtTop();
+    return;
+  }
+
+  // Settings writes, so it always runs as yourself.
+  if (h.startsWith('#/settings')) { leaveViewingAs(); renderSettings(); startAtTop(); return; }
 
   let m = h.match(/^#\/w\/([\w-]+)\/s\/([\w-]+)/);
   if (m) {
@@ -331,6 +386,155 @@ function renderHome() {
   updateHeader();
 }
 
+/* ---------------------------------------------------------------- instructor view
+
+   An instructor opens a student's worksheets by loading that student's state
+   into the same renderer the student uses. `viewingAs` is the switch: while it
+   is set, saveState is a no-op, every writing control is hidden, and videos
+   don't mount — so reading someone's work can never change it. */
+
+let viewingAs = null;   // { oid, name, email } while inspecting a student
+let ownState = null;    // the instructor's own state, put back on the way out
+let rosterCache = null; // last roster payload, so a deep link can resolve a name
+
+async function loadRoster() {
+  const { students } = await (await api('/api/instructor/students')).json();
+  rosterCache = students || [];
+  return rosterCache;
+}
+
+function ago(ts) {
+  if (!ts) return 'never';
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+// Denominators for the roster, counted the same way the header does: the bonus
+// shelf is not part of the semester.
+function semesterTotals() {
+  let steps = 0, sections = 0;
+  for (const w of WORKSHEETS) {
+    if (w.extra) continue;
+    sections += w.sections.length;
+    for (const sec of w.sections) steps += sec.steps.length;
+  }
+  return { steps, sections };
+}
+
+async function renderRoster() {
+  const view = $('#view');
+  view.classList.remove('wide');
+  view.innerHTML = `
+    <div class="flow-topbar"><a class="crumb" href="#/">\u25c2 Worksheets</a></div>
+    <section class="hero compact"><h1>Students</h1></section>
+    <section class="section is-active" id="roster-card"><p class="sec-tagline">Loading\u2026</p></section>`;
+
+  let students;
+  try { students = await loadRoster(); }
+  catch (e) {
+    const card = $('#roster-card');
+    if (card) card.innerHTML = `<p class="sec-tagline">${e.name === 'AuthError' ? 'Your sign-in expired \u2014 sign in again to see the roster.' : 'Couldn\u2019t load the roster \u2014 check your connection and try again.'}</p>`;
+    return;
+  }
+
+  const card = $('#roster-card');
+  if (!card) return; // navigated away while loading
+  if (!students.length) {
+    card.innerHTML = '<p class="sec-tagline">No students have signed in yet.</p>';
+    return;
+  }
+
+  const totals = semesterTotals();
+  card.innerHTML = `
+    <p class="sec-tagline">${students.length} student${students.length === 1 ? '' : 's'} signed in so far \u00b7 click anyone to read their worksheets</p>
+    <div class="table-wrap"><table class="roster">
+      <thead><tr>
+        <th>Name</th><th class="r-email">Email</th><th>Steps</th><th>XP</th><th>Artifacts</th><th>Last seen</th><th></th>
+      </tr></thead>
+      <tbody>${students.map(st => `
+        <tr data-student="${esc(st.oid)}">
+          <td class="r-name">${esc(st.name)}</td>
+          <td class="r-email">${esc(st.email)}</td>
+          <td class="r-num">${st.stepsDone}/${totals.steps}</td>
+          <td class="r-num">${st.xp}</td>
+          <td class="r-num">${st.artifacts}/${totals.sections}</td>
+          <td class="r-num" title="${esc(new Date(st.lastSeen || 0).toLocaleString())}">${esc(ago(st.lastSeen))}</td>
+          <td><button class="ask-btn" data-dl="${esc(st.oid)}" title="Download this student\u2019s Builder file">\u2b07</button></td>
+        </tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+function showViewBanner() {
+  const b = document.getElementById('viewBanner');
+  const n = document.getElementById('viewName');
+  if (n && viewingAs) n.textContent = viewingAs.name || viewingAs.email || 'this student';
+  if (b) b.hidden = false;
+}
+
+function hideViewBanner() {
+  const b = document.getElementById('viewBanner');
+  if (b) b.hidden = true;
+}
+
+async function enterViewingAs(oid) {
+  const hashAtStart = location.hash;
+  // Every await below is a chance for the student to click Back, so re-check
+  // that this is still the view they want before touching anything.
+  const stillWanted = () => location.hash === hashAtStart;
+
+  // Settle our own work before `state` starts pointing at someone else's.
+  if (inflightWork) { try { await inflightWork; } catch { /* the review reports its own failure */ } }
+  await flushPendingSave();
+  if (!stillWanted()) return;
+
+  if (!rosterCache) {
+    try { await loadRoster(); } catch { if (stillWanted()) location.hash = '#/instructor'; return; }
+    if (!stillWanted()) return;
+  }
+  const row = (rosterCache || []).find(r => r.oid === oid);
+  if (!row) { location.hash = '#/instructor'; return; }
+
+  let loaded;
+  try {
+    loaded = await (await api(`/api/instructor/students/${encodeURIComponent(oid)}/state`)).json();
+  } catch { if (stillWanted()) location.hash = '#/instructor'; return; }
+  if (!stillWanted()) return;
+
+  if (!viewingAs) ownState = state;   // first hop in — remember our own work
+  viewingAs = row;
+  state = normalizeState(loaded);
+  // Per-section view memory belongs to whoever we were looking at before.
+  focusView.clear(); listRows.clear(); threadOpen.clear();
+  document.body.classList.add('readonly');
+  showViewBanner();
+  renderHome();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function leaveViewingAs() {
+  if (!viewingAs) return;
+  state = ownState;
+  ownState = null;
+  viewingAs = null;
+  focusView.clear(); listRows.clear(); threadOpen.clear();
+  document.body.classList.remove('readonly');
+  hideViewBanner();
+  updateHeader();
+}
+
+/* Controls that would write something. While viewing a student they are hidden
+   by CSS; this is the belt to that braces, in case a click lands anyway. */
+const MUTATING_SEL = '[data-review],[data-savejournal],[data-saveboard],[data-redo],[data-redostep],'
+  + '[data-unmaster],[data-copyprompt],[data-copypractice],[data-boardadd],[data-boarddel],'
+  + '[data-listadd],[data-listdel],[data-importmd],[data-showbackups],[data-restorebackup],'
+  + '[data-hardreset],[data-freeroam],[data-backend]';
+
 /* ---------------------------------------------------------------- settings view */
 
 async function renderSettings() {
@@ -341,10 +545,10 @@ async function renderSettings() {
     <section class="hero compact"><h1>Settings</h1></section>
     <section class="section is-active" id="settings-card"><p class="sec-tagline">Loading…</p></section>`;
   let s = null;
-  try { s = await (await fetch('/api/settings', { cache: 'no-store' })).json(); } catch { /* server down */ }
+  try { s = await (await api('/api/settings')).json(); } catch { /* offline or signed out */ }
   const card = $('#settings-card');
   if (!card) return; // user navigated away while loading
-  if (!s) { card.innerHTML = '<p class="sec-tagline">Couldn’t reach the local server — is it running?</p>'; return; }
+  if (!s) { card.innerHTML = '<p class="sec-tagline">Couldn’t load your settings — check your connection and try again.</p>'; return; }
   appSettings.freeRoam = !!s.freeRoam;
   card.innerHTML = settingsCardHTML(s);
   card.insertAdjacentHTML('afterend', progressCardHTML(s) + dataCardHTML() + dangerCardHTML());
@@ -352,7 +556,7 @@ async function renderSettings() {
 }
 
 /* The Builder file is BOTH the submission and the manual fallback: download it to
-   hand in or keep safe, upload one to restore that work onto this machine. */
+   hand in or keep safe, upload one to restore that work into your account. */
 function dataCardHTML() {
   return `
   <section class="section is-active">
@@ -376,7 +580,7 @@ async function showBackupList() {
   const box = document.getElementById('backupList');
   if (!box) return;
   let list = [];
-  try { list = (await (await fetch('/api/backups', { cache: 'no-store' })).json()).backups || []; } catch { /* server down */ }
+  try { list = (await (await api('/api/backups')).json()).backups || []; } catch { /* offline or signed out */ }
   if (!list.length) {
     box.innerHTML = '<p class="sec-tagline">No automatic backups yet — they appear as soon as steps get completed or submitted.</p>';
     return;
@@ -391,14 +595,14 @@ async function showBackupList() {
 }
 
 async function restoreBackup(file, label) {
-  if (!confirm(`Roll everything on this machine back to the snapshot from ${label}? Today's progress is snapshotted first, so this can itself be undone.`)) return;
+  if (!confirm(`Roll your account back to the snapshot from ${label}? Today's progress is snapshotted first, so this can itself be undone.`)) return;
   try {
-    const r = await (await fetch('/api/backups/restore', {
+    const r = await (await api('/api/backups/restore', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file }),
     })).json();
     if (!r.ok) throw new Error('restore failed');
   } catch {
-    alert('Couldn’t restore that backup — is the server still running?');
+    alert('Couldn’t restore that backup — check your connection and try again.');
     return;
   }
   location.hash = '#/';
@@ -480,7 +684,7 @@ async function importBuilderFile(input) {
   if (!data) { alert('That doesn’t look like a Builder file — pick the .md file downloaded from this page.'); return; }
   const n = Object.values(data.steps).filter(st => st.status === 'done').length;
   if (!n && !Object.keys(data.mastery).length) { alert('No completed steps found in that Builder file.'); return; }
-  if (!confirm(`Restore from this Builder file? It holds ${n} completed step${n === 1 ? '' : 's'} and ${data.xp} XP. Everything currently on this machine will be replaced by it.`)) return;
+  if (!confirm(`Restore from this Builder file? It holds ${n} completed step${n === 1 ? '' : 's'} and ${data.xp} XP. Everything currently in your account will be replaced by it.`)) return;
   state = data;
   await saveState(true);
   location.hash = '#/';
@@ -494,7 +698,7 @@ function dangerCardHTML() {
       <div class="sec-kicker">DANGER ZONE</div>
       <h2 class="sec-title">Start completely over</h2>
     </div>
-    <p class="sec-tagline">Erases every answer, artifact, review thread, XP point, and streak on this machine — all worksheets back to brand new. There is no undo.</p>
+    <p class="sec-tagline">Erases every answer, artifact, review thread, XP point, and streak in your account — all worksheets back to brand new. There is no undo.</p>
     <div class="answer-tools"><button class="btn danger" data-hardreset>⟲ Hard reset — erase everything</button></div>
   </section>`;
 }
@@ -526,21 +730,34 @@ function progressCardHTML(s) {
   </section>`;
 }
 
+const ENGINE_LABEL = { codex: 'OpenAI', claude: 'Anthropic Claude' };
+
 function settingsCardHTML(s) {
-  const status = e => e.available
-    ? `<span class="chip ok">installed ✓</span>`
-    : `<span class="chip warn">not installed</span>`;
-  const opts = [
-    { v: 'codex', title: 'Codex', desc: 'OpenAI’s agent CLI — uses the ChatGPT account signed in on this machine. About 15s per review.', chip: status(s.engines.codex) },
-    { v: 'claude', title: 'Claude Code', desc: 'Anthropic’s agent CLI — uses the Claude account signed in on this machine. About 60s per review.', chip: status(s.engines.claude) },
-  ];
-  // Machines that saved the old 'auto' setting show whichever engine auto resolved to.
-  const sel = s.reviewBackend === 'auto' ? s.active : s.reviewBackend;
-  return `
+  const head = `
     <div class="sec-headtext">
       <div class="sec-kicker">AI REVIEWER</div>
       <h2 class="sec-title">Which engine reviews the work</h2>
-    </div>
+    </div>`;
+
+  /* Only one API key configured means there is nothing to choose between — show
+     what's running instead of a picker that can't do anything. (An older server
+     sends no canChooseEngine at all; treat that as "show the picker".) */
+  if (s.canChooseEngine === false) {
+    return head + `<p class="active-note">${s.activeAvailable
+      ? `Reviews run on <b>${esc(ENGINE_LABEL[s.active] || s.active)}</b>, set up by your instructor.`
+      : 'No AI reviewer is set up yet — ask your instructor.'}</p>`;
+  }
+
+  const status = e => e.available
+    ? `<span class="chip ok">ready ✓</span>`
+    : `<span class="chip warn">not configured</span>`;
+  const opts = [
+    { v: 'codex', title: 'Codex', desc: 'OpenAI’s models, over the API.', chip: status(s.engines.codex) },
+    { v: 'claude', title: 'Claude', desc: 'Anthropic’s Claude, over the API.', chip: status(s.engines.claude) },
+  ];
+  // Accounts that saved the old 'auto' setting show whichever engine it resolved to.
+  const sel = s.reviewBackend === 'auto' ? s.active : s.reviewBackend;
+  return head + `
     <div class="opt-list">
       ${opts.map(o => `
       <button class="opt ${sel === o.v ? 'sel' : ''}" data-backend="${o.v}">
@@ -1152,6 +1369,7 @@ function renderScroll(ws, section) {
 /* ---------------------------------------------------------------- video wiring */
 
 function mountVideo(section, step) {
+  if (viewingAs) return; // a gate that completed would mutate the work being read
   const k = keyOf(section, step);
   const st = stepState(k);
   const id = cssId(k);
@@ -1180,6 +1398,7 @@ function mountVideo(section, step) {
 }
 
 function completeVideo(section, step) {
+  if (viewingAs) return;
   const k = keyOf(section, step);
   const st = stepState(k);
   if (st.status === 'done') return;
@@ -1328,7 +1547,23 @@ function setAnswerBusy(k, busy) {
   });
 }
 
+/* Resolves while an AI submission is in flight. The verdict handler below writes
+   into whatever `state` points at, so anything that would repoint it (an
+   instructor opening a student) waits for this first. */
+let inflightWork = null;
+
 async function submitReview(section, step) {
+  let done;
+  inflightWork = new Promise(r => { done = r; });
+  try {
+    return await submitReviewInner(section, step);
+  } finally {
+    inflightWork = null;
+    done();
+  }
+}
+
+async function submitReviewInner(section, step) {
   const k = keyOf(section, step);
   const st = stepState(k);
   const id = cssId(k);
@@ -1377,7 +1612,7 @@ async function submitReview(section, step) {
 
   let verdict;
   try {
-    const res = await fetch('/api/review', {
+    const res = await api('/api/review', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sectionId: section.id, stepId: step.id, answer: val, attempt: st.attempts,
@@ -1388,8 +1623,16 @@ async function submitReview(section, step) {
       }),
     });
     verdict = await res.json();
-  } catch {
-    verdict = { pass: false, offline: true, feedback: 'Couldn’t reach the local server — is `node server.js` still running?', reasons: [], hint: '', masteryFlags: [] };
+  } catch (e) {
+    // An expired sign-in and a dropped connection get different advice, but
+    // both come back as an `offline` round that costs the student no attempt.
+    verdict = {
+      pass: false, offline: true,
+      feedback: e.name === 'AuthError'
+        ? 'Your sign-in expired. Use the banner at the top to sign in again, then resubmit — this attempt wasn’t counted.'
+        : 'Couldn’t reach Builders AI — check your connection and try again. This attempt wasn’t counted.',
+      reasons: [], hint: '', masteryFlags: [],
+    };
   }
 
   if (verdict.offline) {
@@ -1454,7 +1697,7 @@ async function draftFromWork(section, step) {
 
   let text = '';
   try {
-    const res = await fetch('/api/assist', {
+    const res = await api('/api/assist', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sectionId: section.id, stepId: step.id, kind: 'draft' }),
     });
@@ -1483,6 +1726,7 @@ async function draftFromWork(section, step) {
 const autoDraftTried = new Set();
 
 function maybeAutoDraft(section) {
+  if (viewingAs) return; // never spend a draft call on someone else's step
   for (const step of section.steps) {
     if (step.type !== 'synthesis') continue;
     const k = keyOf(section, step);
@@ -1534,7 +1778,7 @@ function showCopyFallback(k, text) {
 }
 
 // Copy a self-contained prompt so the student can work in any AI chat:
-// kind 'review' = get feedback when the local reviewer is down;
+// kind 'review' = get feedback when the reviewer is down;
 // kind 'practice' = the role-played practice interview.
 async function copyPortablePrompt(btn, kind) {
   const k = btn.dataset.copyprompt || btn.dataset.copypractice;
@@ -1548,7 +1792,7 @@ async function copyPortablePrompt(btn, kind) {
 
   let prompt;
   try {
-    const res = await fetch('/api/prompt', {
+    const res = await api('/api/prompt', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sectionId: section.id, stepId: step.id, kind: kind || 'review',
@@ -1559,7 +1803,7 @@ async function copyPortablePrompt(btn, kind) {
     });
     prompt = (await res.json()).prompt;
   } catch {
-    btn.textContent = '✗ Couldn’t reach the local server';
+    btn.textContent = '✗ Couldn’t reach the server — try again';
     restore();
     return;
   }
@@ -1635,23 +1879,26 @@ function redoStep(k) {
 
 /* ---------------------------------------------------------------- builder file export */
 
-function exportBuilderFile() {
-  const lines = ['# Builders Club — Builder File', '', `_Exported ${new Date().toLocaleString()} · ${state.xp} XP · ${state.streak}-day streak_`, ''];
+function exportBuilderFile(src, filename) {
+  const s = src || state;
+  const done = k => !!(s.steps[k] && s.steps[k].status === 'done');
+  const mastered = k => !done(k) && !!s.mastery[k];
+  const lines = ['# Builders Club — Builder File', '', `_Exported ${new Date().toLocaleString()} · ${s.xp} XP · ${s.streak}-day streak_`, ''];
   for (const ws of WORKSHEETS) {
-    const touched = ws.sections.some(s => s.steps.some(st => {
-      const k = keyOf(s, st);
-      return isDone(k) || isMastered(k);
+    const touched = ws.sections.some(sec => sec.steps.some(st => {
+      const k = keyOf(sec, st);
+      return done(k) || mastered(k);
     }));
     if (!touched) continue;
     lines.push(`# ${ws.title}`, '');
     for (const section of ws.sections) {
     lines.push(`## ${section.num}. ${section.title}`);
-    const artifact = state.artifacts[section.id];
+    const artifact = s.artifacts[section.id];
     if (artifact) lines.push('', `> **${section.artifactLabel}**`, '>', ...artifact.split('\n').map(l => '> ' + l), '');
     for (const step of section.steps) {
       const k = keyOf(section, step);
-      const st = state.steps[k];
-      if (isMastered(k)) { lines.push(`### ${step.title}`, '', `_Mastered — skipped. ${state.mastery[k].reason}_`, ''); continue; }
+      const st = s.steps[k];
+      if (mastered(k)) { lines.push(`### ${step.title}`, '', `_Mastered — skipped. ${s.mastery[k].reason}_`, ''); continue; }
       if (!st || st.status !== 'done') continue;
       lines.push(`### ${step.title}`, '');
       if (step.type === 'video') {
@@ -1667,9 +1914,25 @@ function exportBuilderFile() {
   const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'my-builder-file.md';
+  a.download = filename || 'my-builder-file.md';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+function slug(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'student';
+}
+
+// The roster's ⬇ button: fetch that student's work and write their Builder file
+// without disturbing whatever the instructor is currently looking at.
+async function downloadStudentFile(oid) {
+  const row = (rosterCache || []).find(r => r.oid === oid);
+  try {
+    const theirs = normalizeState(await (await api(`/api/instructor/students/${encodeURIComponent(oid)}/state`)).json());
+    exportBuilderFile(theirs, slug(row && row.name) + '-builder-file.md');
+  } catch {
+    alert('Couldn\u2019t download that Builder file — check your connection and try again.');
+  }
 }
 
 /* ---------------------------------------------------------------- wiring */
@@ -1693,6 +1956,14 @@ function wire() {
   }, true);
 
   document.addEventListener('click', e => {
+    // Reading a student's work: swallow anything that would write to it.
+    if (viewingAs && e.target.closest(MUTATING_SEL)) { e.preventDefault(); return; }
+
+    const student = e.target.closest('[data-student]');
+    const dl = e.target.closest('[data-dl]');
+    if (dl) { e.stopPropagation(); downloadStudentFile(dl.dataset.dl); return; }
+    if (student) { location.hash = '#/instructor/' + student.dataset.student; return; }
+
     const coll = e.target.closest('[data-collapse]');
     if (coll) {
       const k = coll.dataset.collapse;
@@ -1721,7 +1992,7 @@ function wire() {
     const fr = e.target.closest('[data-freeroam]');
     if (fr) {
       const y = window.scrollY; // re-render resets scroll — put the user back where they were
-      fetch('/api/settings', {
+      api('/api/settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ freeRoam: fr.dataset.freeroam === 'on' }),
       }).then(r => r.json())
@@ -1734,7 +2005,7 @@ function wire() {
     const be = e.target.closest('[data-backend]');
     if (be) {
       const y = window.scrollY;
-      fetch('/api/settings', {
+      api('/api/settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewBackend: be.dataset.backend }),
       }).then(() => renderSettings())
@@ -1759,7 +2030,11 @@ function wire() {
     }
 
     const exp = e.target.closest('[data-export]');
-    if (exp) { exportBuilderFile(); return; }
+    if (exp) {
+      // While viewing a student, `state` IS their work — name the file for them.
+      exportBuilderFile(state, viewingAs ? slug(viewingAs.name) + '-builder-file.md' : 'my-builder-file.md');
+      return;
+    }
 
     const ims = e.target.closest('[data-importmd]');
     if (ims) { const inp = document.getElementById('importFile'); if (inp) inp.click(); return; }
@@ -1790,10 +2065,10 @@ function wire() {
 
     const hr = e.target.closest('[data-hardreset]');
     if (hr) {
-      if (!confirm('Hard reset: this erases EVERY answer, artifact, XP point, and streak — all worksheets back to brand new. There is no undo.\n\nErase everything?')) return;
-      fetch('/api/reset', { method: 'POST' })
+      if (!confirm('Hard reset: this erases EVERY answer, artifact, XP point, and streak in your account — all worksheets back to brand new. There is no undo.\n\nErase everything?')) return;
+      api('/api/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
         .then(() => { location.hash = '#/'; location.reload(); })
-        .catch(() => alert('Couldn’t reach the local server.'));
+        .catch(() => alert('Couldn’t reset — check your connection and try again.'));
       return;
     }
 
@@ -1948,25 +2223,116 @@ function wire() {
   window.addEventListener('hashchange', route);
 }
 
+/* ---------------------------------------------------------------- sign-in views */
+
+/* Signed out. The worksheets themselves say nothing about who you are, so this
+   is the whole gate: one button that hands off to Microsoft. */
+function renderLogin({ devLogin, problem }) {
+  document.body.classList.add('anon');
+  const note = {
+    failed: 'That sign-in didn\u2019t go through. Try again, and tell your instructor if it keeps happening.',
+    expired: 'That sign-in took too long and expired. Give it another go.',
+    tenant: 'That looks like a personal Microsoft account. Use the one your school gave you.',
+    unconfigured: 'Sign-in isn\u2019t set up on this site yet \u2014 your instructor needs to finish configuring it.',
+  }[problem];
+
+  $('#view').innerHTML = `
+    <section class="hero">
+      <span class="kicker">Builders Club \u00b7 one semester</span>
+      <h1>Your<br>Worksheets</h1>
+      <p>Scaffolded worksheets with an AI reviewer built in. Sign in and pick up exactly where you left off \u2014 your answers save themselves as you type.</p>
+    </section>
+    <section class="section is-active">
+      <div class="sec-headtext">
+        <div class="sec-kicker">SIGN IN</div>
+        <h2 class="sec-title">Use your school Microsoft account</h2>
+      </div>
+      <p class="sec-tagline">The same email and password you use for school. We keep your name, your email, and your worksheet answers \u2014 nothing else.</p>
+      ${note ? `<p class="sec-tagline login-err">${esc(note)}</p>` : ''}
+      <div class="answer-tools">
+        <a class="btn" href="/auth/login">Sign in with your school account \u25b8</a>
+        ${devLogin ? '<a class="ask-btn" href="/auth/dev" title="Local development only \u2014 add ?as=name for another test student">Dev sign-in</a>' : ''}
+      </div>
+    </section>`;
+}
+
+/* Something went wrong that reloading might fix. Deliberately does NOT invent an
+   empty state: writing that back would erase real work. */
+function renderFatal(message) {
+  // The header counters would read 0, which is worse than showing nothing.
+  document.body.classList.add('anon');
+  $('#view').innerHTML = `
+    <section class="section is-active">
+      <div class="sec-headtext">
+        <div class="sec-kicker">HANG ON</div>
+        <h2 class="sec-title">Couldn\u2019t load your worksheets</h2>
+      </div>
+      <p class="sec-tagline">${esc(message)}</p>
+      <div class="answer-tools"><button class="btn" onclick="location.reload()">Reload the page</button></div>
+    </section>`;
+}
+
+function showWho() {
+  const who = document.getElementById('who');
+  const name = document.getElementById('whoName');
+  if (who && me) {
+    if (name) { name.textContent = (me.name || me.email || '').split(' ')[0]; name.title = me.name || me.email || ''; }
+    who.hidden = false;
+  }
+  const btn = document.getElementById('instructorBtn');
+  if (btn && me && me.role === 'instructor') btn.hidden = false;
+}
+
 /* ---------------------------------------------------------------- boot */
 
-async function boot() {
-  try {
-    state = await (await fetch('/api/state', { cache: 'no-store' })).json();
-  } catch {
-    state = { xp: 0, streak: 0, lastActiveDay: '', steps: {}, artifacts: {}, mastery: {} };
+// Fill in anything an older or partial state is missing, so every render path
+// can assume the same shape. Shared with the instructor's read-only view.
+function normalizeState(s) {
+  const next = s && typeof s === 'object' ? s : {};
+  if (!next.steps) next.steps = {};
+  if (!next.artifacts) next.artifacts = {};
+  if (!next.mastery) next.mastery = {};
+  if (typeof next.xp !== 'number') next.xp = 0;
+  if (typeof next.streak !== 'number') next.streak = 0;
+  // Migrate pre-flag states: anything already done has already earned its XP.
+  for (const st of Object.values(next.steps)) {
+    if (st && st.status === 'done' && st.xpAwarded === undefined) st.xpAwarded = true;
   }
+  return next;
+}
+
+async function fetchMe() {
+  const res = await fetch('/api/me', { cache: 'no-store' });
+  if (!res.ok) throw new Error('could not reach the server');
+  return res.json();
+}
+
+async function boot() {
+  let who;
   try {
-    const s = await (await fetch('/api/settings', { cache: 'no-store' })).json();
+    who = await fetchMe();
+  } catch {
+    return renderFatal('We couldn\u2019t reach the server. Check your connection and reload.');
+  }
+
+  if (!who.authenticated) {
+    const problem = new URLSearchParams(location.search).get('auth');
+    return renderLogin({ devLogin: !!who.devLogin, problem: who.configured === false && !problem ? 'unconfigured' : problem });
+  }
+  me = who;
+  document.body.classList.remove('anon');
+
+  try {
+    state = normalizeState(await (await api('/api/state')).json());
+  } catch (e) {
+    if (e.name === 'AuthError') return renderLogin({ devLogin: false });
+    return renderFatal('We couldn\u2019t load your work just now. Reload the page \u2014 nothing has been changed.');
+  }
+
+  try {
+    const s = await (await api('/api/settings')).json();
     appSettings.freeRoam = !!s.freeRoam;
   } catch { /* defaults stand */ }
-  if (!state.steps) state.steps = {};
-  if (!state.artifacts) state.artifacts = {};
-  if (!state.mastery) state.mastery = {};
-  // Migrate pre-flag states: anything already done has already earned its XP.
-  for (const st of Object.values(state.steps)) {
-    if (st.status === 'done' && st.xpAwarded === undefined) st.xpAwarded = true;
-  }
 
   // margin gears + header
   const G = window.BuildersGears;
@@ -1977,6 +2343,7 @@ async function boot() {
   G.initScrollGears();
 
   wire();
+  showWho();
   route();
   // The web fonts land after the first render and change how the text wraps,
   // so measure again once they're in.

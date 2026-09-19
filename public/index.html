@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-  Builders Club — MVP Worksheet DEMO (real AI via local `claude -p` server).
-  Run `node server.js` from worksheet-demo/ and open http://localhost:4321
+  Builders Club — semester worksheets.
+  A single-page app served by server.js. Students sign in with their school
+  Microsoft account; progress is saved per student on the server.
 -->
 <html lang="en">
 <head>
@@ -33,7 +34,20 @@
     <div class="stat"><span class="num" id="secNum">0</span>/<span class="num" id="secDen">8</span> artifacts</div>
     <div class="stat xp">⚡ <span class="num" id="xpNum">0</span> XP</div>
     <div class="stat streak">🔥 <span class="num" id="streakNum">0</span> streak</div>
+    <div class="who" id="who" hidden>
+      <span class="who-name" id="whoName"></span>
+      <a class="who-out" href="/auth/logout">Sign out</a>
+    </div>
+    <a class="gear-btn" href="#/instructor" id="instructorBtn" title="Students" hidden>👥</a>
     <a class="gear-btn" href="#/settings" title="Settings">⚙</a>
+  </div>
+  <div class="auth-banner" id="authBanner" hidden>
+    Your sign-in expired. <a href="/auth/login" target="_blank" rel="noopener">Sign in again</a> in a new tab, then come back and retry — nothing you typed here is lost.
+  </div>
+  <div class="view-banner" id="viewBanner" hidden>
+    <span>👁 Viewing <b id="viewName"></b> (read-only)</span>
+    <a href="#/instructor">Back to roster</a>
+    <button class="ask-btn" data-export>⬇ Builder file</button>
   </div>
 </header>
 

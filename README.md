@@ -2,197 +2,142 @@
 
 Interactive semester worksheets for Builders Club, with **AI review** built in. Students work through scaffolded chains of journals, gated video segments, and exercises; each worksheet builds on top of the previous ones allowing for a cohesive experience.
 
-
 ![Worksheet hub](docs/screenshots/hub.png)
 
-Every submission is reviewed against the step's rubric by **Codex** (OpenAI) or **Claude Code** (Anthropic). That means:
+Every submission is reviewed against the step's rubric by **Claude** (Anthropic) or **Codex** (OpenAI). It runs as a website, so:
 
-- **No API keys.** No `.env` files, no keys to buy or rotate.
-- **No accounts to create.** It reuses the ChatGPT or Claude login you already have.
-- **No database.** Student progress is a single JSON file on disk.
-
----
-
-## What you need
-
-| Requirement | Why | Get it |
-|---|---|---|
-| **Node.js 18+** | Runs the local server (no dependencies to install) | [nodejs.org](https://nodejs.org) — download the LTS installer |
-| **Codex CLI** *and/or* **Claude Code** | Powers the AI reviews | Setup steps below |
-
-You only need **one** of the two CLIs. If you have both, the app lets you switch between them in Settings.
-
-Check whether you already have Node:
-
-```bash
-node --version
-```
-
-If that prints `v18` or higher, you're set.
+- **Students install nothing.** They open a link and sign in with their school Microsoft account.
+- **One set of API keys.** The instructor sets them once on the server; students never see or need a key.
+- **No database.** Each student's progress is a JSON file on a persistent disk.
 
 ---
 
-## Step 1 — Download the worksheet demo
+## For students
 
-**Clone it — don't download the ZIP:**
+1. Open the link your instructor gave you.
+2. Click **Sign in with your school account** and use your normal school email and password.
+3. Work through the sections.
 
-```bash
-git clone https://github.com/1729-Learning/Builders-Club-Worksheets.git
-cd Builders-Club-Worksheets
-```
+That's the whole setup. A few things worth knowing:
 
-Worksheets get fixed and added to during the semester, and a cloned folder can update itself in one double-click while keeping all your work (see [Getting updates](#getting-updates)). A ZIP can't — you'd have to re-download the whole thing into a new folder and move your progress across by hand.
-
-<details>
-<summary>No git installed?</summary>
-
-On macOS, run `git --version` once and the system offers to install the Command Line Tools for you. Otherwise get it from [git-scm.com](https://git-scm.com).
-
-</details>
-
----
-
-## Step 2 — Set up an AI reviewer
-
-
-### Option A: Codex
-
-Codex is OpenAI's agent CLI. It signs in with a regular **ChatGPT account** (Plus/Pro/Team). Docs: [developers.openai.com/codex/cli](https://developers.openai.com/codex/cli)
-
-1. Install it:
-
-```bash
-npm install -g @openai/codex
-```
-
-2. Sign in (opens your browser — choose **Sign in with ChatGPT**):
-
-```bash
-codex
-```
-
-3. Verify it works:
-
-```bash
-codex --version
-```
-
-### Option B: Claude Code
-
-Claude Code is Anthropic's agent CLI. It signs in with a **Claude account** (Pro/Max). Docs: [claude.com/claude-code](https://claude.com/claude-code) · [setup guide](https://docs.claude.com/en/docs/claude-code/setup)
-
-1. Install it:
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-2. Start it once and follow the browser login prompt:
-
-```bash
-claude
-```
-
-3. Verify it works:
-
-```bash
-claude --version
-```
-
----
-
-## Step 3 — Run it
-
-**Double-click `Start Worksheets.command`** in the `Builders-Club-Worksheets` folder. It starts the server and opens the page for you. Leave the window it opens alone while you work — closing it stops the worksheets.
-
-<details>
-<summary>macOS says it can't open the file / "unidentified developer"</summary>
-
-The first time only: right-click `Start Worksheets.command` → **Open** → **Open** again. macOS remembers after that.
-</details>
-
-Prefer a terminal? Same thing by hand, from the same folder:
-
-```bash
-node server.js
-```
-
-Either way, open **http://localhost:4321** in your browser.
-
-The startup log tells you which reviewer it found and which one it's using. If no CLI is detected, the app still runs — AI reviews just show a "reviewer is offline" notice until you finish Step 2.
-
----
-
-## Step 4 — Choose your review engine
-
-Click the **⚙ gear** in the top-right of the app. The Settings page shows which engines are installed and lets you switch. Your choice persists in `data/settings.json`.
-
-![Settings page — choosing between Codex and Claude Code](docs/screenshots/settings.png)
-
-- **Codex** — tested to be slightly faster.
-- **Claude Code** — gives better feedback sometimes.
-- Until you pick one, it uses Codex when installed, otherwise Claude Code.
-
-Settings also controls **progression**: *Guided* (sections unlock in order — the default classroom experience) vs *Free roam* (everything unlocked, any order).
-
----
-
-## Using the worksheets
-
-![A worksheet step with a gated video segment](docs/screenshots/step.png)
-
-- **Video steps** plays a segment of a YouTube video thats been picked for its quality.
+- **Your answers save themselves** as you type — there is no save button for drafts, and you can close the tab whenever you like.
+- **It works on a phone or a laptop**, and you can switch between them. Your work follows your account, not the device.
+- **Video steps** play a segment of a video picked for its quality; the next step unlocks when it finishes.
 - **Exercise steps** are reviewed by the AI against that step's rubric. The goal is to iterate towards a good response, not to get graded or rush towards completion.
 - **Journal steps** are private reflections; the AI can reference them later to connect ideas.
 - Finished sections mint **artifacts** — the tangible outputs (problem statement, MVP plan, …).
 
-Progress, XP, and streaks live in `data/state.json`. Delete that file to reset everything to a fresh student.
+![A worksheet step with a gated video segment](docs/screenshots/step.png)
+
+To hand work in or keep a copy, open **⚙ Settings → Download Builder file**. Uploading one restores that work into your account. If you ever want to start over, Settings has a hard reset that clears your account only.
 
 ---
 
-## Getting updates
+## For instructors: deploying on Railway
 
-**Double-click `Update Worksheets.command`.** 
+You need a Microsoft Entra ID app registration (for sign-in), a Railway project (to host it), and at least one AI API key.
 
-**Your work is never at risk.** Everything you've written — answers, artifacts, XP, streak — lives in the `data/` folder, which git ignores completely. Updating only replaces the worksheet files themselves. There is nothing to back up and nothing to migrate.
+### 1. Register the app in Microsoft Entra ID
 
-You can also do it by hand if you prefer:
+In the [Azure portal](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **New registration**:
 
-```bash
-git pull --rebase --autostash
+- **Supported account types:** *Accounts in this organizational directory only* — single tenant, so only your school's accounts can sign in.
+- **Redirect URI:** platform **Web**, value `https://YOUR-APP.up.railway.app/auth/callback`. You get the real domain in step 2; come back and set it then.
+- After creating it, note the **Application (client) ID** and **Directory (tenant) ID** from the Overview page.
+- Under **Certificates & secrets** → **New client secret**, copy the secret **Value** (not the Secret ID — the value is shown only once).
+
+### 2. Create the Railway service
+
+1. New project → **Deploy from GitHub repo** → pick this repository.
+2. **Settings → Networking → Generate Domain.** That URL is your `PUBLIC_BASE_URL`. Put `PUBLIC_BASE_URL/auth/callback` into the Entra redirect URI from step 1.
+3. **Add a Volume** to the service and mount it at `/data`. Without it, every student's work is erased on the next deploy.
+4. Leave the service at **1 replica**. Student work is files on that one volume, so a second replica would race on writes.
+
+### 3. Set the variables
+
+Copy what you need from [`.env.example`](.env.example). At a minimum:
+
+```
+PUBLIC_BASE_URL=https://YOUR-APP.up.railway.app
+SESSION_SECRET=<openssl rand -hex 32>
+MS_TENANT_ID=...
+MS_CLIENT_ID=...
+MS_CLIENT_SECRET=...
+INSTRUCTOR_EMAILS=you@school.edu
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Then **restart the server.**
+Railway sets `PORT` and `RAILWAY_VOLUME_MOUNT_PATH` itself. Redeploy after saving.
+
+### 4. Check it
+
+- `https://YOUR-APP.up.railway.app/healthz` returns `{"ok":true}`.
+- Sign in with your own school account. Because your email is in `INSTRUCTOR_EMAILS`, a **👥** button appears in the top bar.
+- The deploy logs name the reviewer and the sign-in mode at boot, and print one line per AI call with its token counts — that is your running cost.
+
+### The student roster
+
+**👥** lists everyone who has signed in: steps done, XP, artifacts, and when they were last active. Click a row to read that student's worksheets exactly as they see them, read-only — nothing you do while viewing can change their work. The **⬇** button downloads any student's Builder file.
+
+### Updating worksheets
+
+Push to the repository. Railway redeploys and the new content is live immediately; student work on the volume is untouched.
 
 <details>
-<summary>Instructor note — editing content while students are mid-worksheet</summary>
+<summary>Editing content while students are mid-worksheet</summary>
 
 Progress is denoted by **id** (`"sectionId/stepId"`), stored separately from content, so most edits land safely on a student who's halfway through. Free to change any time: prompts, placeholders, rubrics, lesson panels, reviewer notes, titles, videos and their timestamps, week chips, `buildsOn`, resources — plus adding steps, sections or whole worksheets, and reordering steps.
 
 There are only 3 edits to look out for that cause issues with student work:
 
-1. **Renaming a step or section `id`.** The answer stays in `state.json` but nothing looks for it, and the step reads as untouched. Change titles freely; treat ids as permanent. (`pick-top-5` keeps that id even though it now says "top 3" — that's the pattern.)
+1. **Renaming a step or section `id`.** The answer stays in the student's state file but nothing looks for it, and the step reads as untouched. Change titles freely; treat ids as permanent. (`pick-top-5` keeps that id even though it now says "top 3" — that's the pattern.)
 2. **Deleting a step or section** that students have answered.
 3. **Converting a step to or from a `board`.** Text and list answers share one string field, so textarea ↔ list is safe; boards use a separate field and won't show the old answer. Raising a `min` or `minPerSide` can also make an already-passed step fail on redo.
 </details>
 
 ---
 
-## Configuration reference
+## Local development
 
+```bash
+git clone https://github.com/1729-Learning/Builders-Club-Worksheets.git
+cd Builders-Club-Worksheets
+npm install
+ALLOW_DEV_LOGIN=1 npm start
+```
+
+Open <http://localhost:4321> and click **Dev sign-in**. No Entra tenant needed.
+
+- `/auth/dev?as=alex` signs in as a second student — useful for filling a roster.
+- `/auth/dev?as=instructor` plus `INSTRUCTOR_EMAILS=instructor@dev.local` gives you the roster view.
+- Add `ANTHROPIC_API_KEY=...` to test real reviews; without a key, reviews show a friendly "not set up yet" notice and everything else still works.
+- Data lands in `./data/`, which git ignores.
+
+Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so it cannot be reached on a deployed site.
+
+---
+
+## Configuration reference
 
 | Env var | Default | What it does |
 |---|---|---|
-| `PORT` | `4321` | Server port |
-| `REVIEW_BACKEND` | `auto` | `codex`, `claude`, or `auto`. The ⚙ Settings page overrides this and persists to `data/settings.json`. |
-| `REVIEW_MODEL` | `haiku` | Claude backend model (`haiku` = fast, `sonnet` = smarter) |
-| `CODEX_MODEL` | CLI default | Codex backend model override (e.g. `gpt-5.1-codex-mini`) |
-
-Example:
-
-```bash
-PORT=5000 REVIEW_BACKEND=claude REVIEW_MODEL=sonnet node server.js
-```
+| `PORT` | `4321` | Server port. Railway sets this. |
+| `PUBLIC_BASE_URL` | — | Public https origin. Builds the Microsoft redirect URI and decides whether cookies are `Secure`. Required in production. |
+| `SESSION_SECRET` | — | Signs session cookies. Required in production; changing it signs everyone out. |
+| `SESSION_DAYS` | `30` | How long a sign-in lasts. |
+| `MS_TENANT_ID` / `MS_CLIENT_ID` / `MS_CLIENT_SECRET` | — | The Entra app registration. |
+| `INSTRUCTOR_EMAILS` | empty | Comma-separated emails that get the roster. Case-insensitive, re-read on every request. |
+| `ANTHROPIC_API_KEY` | — | Enables the Claude engine. |
+| `OPENAI_API_KEY` | — | Enables the Codex (OpenAI) engine. |
+| `REVIEW_BACKEND` | `auto` | Default engine: `claude`, `codex`, or `auto`. Students can switch only when both keys are set. |
+| `REVIEW_MODEL` | `claude-sonnet-5` | Anthropic model. |
+| `OPENAI_MODEL` | `gpt-5.6-terra` | OpenAI model. |
+| `REVIEW_MAX_TOKENS` / `DRAFT_MAX_TOKENS` | `32000` / `16000` | Output ceilings. Reviews stream, so a high ceiling is safe. |
+| `AI_TIMEOUT_MS` | `300000` | Per-request timeout. |
+| `AI_CONCURRENCY` | `4` | Simultaneous AI calls across all students; the rest queue. |
+| `REVIEW_DAILY_CAP` | `60` | AI calls per student per day. `0` disables the cap. |
+| `DATA_DIR` | volume, else `./data` | Where per-student JSON lives. |
+| `ALLOW_DEV_LOGIN` | unset | `1` enables `/auth/dev` locally. Ignored in production. |
 
 ---
 
@@ -200,14 +145,13 @@ PORT=5000 REVIEW_BACKEND=claude REVIEW_MODEL=sonnet node server.js
 
 | Symptom | Fix |
 |---|---|
-| Reviews say "the AI reviewer is offline" | The active engine's CLI isn't installed or isn't logged in. Run `codex --version` / `claude --version` to check, re-run the sign-in from Step 2, or switch engines in ⚙ Settings. |
-| `node: command not found` | Install Node.js from [nodejs.org](https://nodejs.org), then reopen your terminal. |
-| macOS won't open a `.command` file | First time only: right-click it → **Open** → **Open**. |
-| Port 4321 already in use | Run with another port: `PORT=5000 node server.js` |
-| `Update Worksheets` says the folder was downloaded as a ZIP | A ZIP has no git history to update from. Clone the repo instead (Step 1), then copy your old `data/` folder into the new one to keep your work. |
-| Update ran but the worksheets look unchanged | Restart the server — `Update Worksheets.command` does this automatically, but a manual `git pull` doesn't. |
-| Want a clean slate | Stop the server and delete `data/state.json`. |
-| Reviews feel slow | Switch to Codex in ⚙ Settings (~15s vs ~60s), or keep working — reviews run in the background per step. |
+| Sign-in bounces back with an error | The redirect URI on the Entra app must match `PUBLIC_BASE_URL/auth/callback` exactly. Check the deploy logs for the reason. |
+| "Use the one your school gave you" | That was a personal Microsoft account. The app is single-tenant by design. |
+| Reviews say the reviewer is unavailable | No API key set, a key that's invalid or out of credit, or that student hit `REVIEW_DAILY_CAP`. The logs say which. |
+| A student's progress vanished after a deploy | The Volume isn't attached, or `DATA_DIR` points somewhere off it. Check the `data:` line in the boot log. |
+| 👥 button missing | That email isn't in `INSTRUCTOR_EMAILS`. It's re-read per request, so just reload after fixing it. |
+| Students see a spinner for a long time | Reviews are queued behind `AI_CONCURRENCY`. Raise it if your rate limits allow. |
+| Someone wants a clean slate | ⚙ Settings → Danger zone → Hard reset. It only touches that one account. |
 
 ---
 
@@ -215,4 +159,4 @@ PORT=5000 REVIEW_BACKEND=claude REVIEW_MODEL=sonnet node server.js
 
 All worksheet content — worksheets, sections, steps, video segments, rubrics, role-plays — lives in [`content.js`](content.js). **Adding a worksheet is config, not code.** Video segments reference YouTube IDs with `start`/`end` times; swap them freely.
 
-The server ([`server.js`](server.js)) is a single dependency-free Node file: it serves the static app, persists state, and shells out to the chosen CLI for reviews. The front-end ([`public/app.js`](public/app.js)) is a hash-routed single-page app, no framework, no build step.
+The server ([`server.js`](server.js)) serves the static app and routes requests; the work is in [`lib/`](lib): `prompts.js` (the review persona and every prompt, as pure functions), `store.js` (per-student state, snapshots, profiles), `ai.js` (provider calls plus concurrency, single-flight and daily caps), and `auth.js` (Microsoft sign-in and signed session cookies). The front-end ([`public/app.js`](public/app.js)) is a hash-routed single-page app, no framework, no build step.
