@@ -125,9 +125,10 @@ async function handleApi(req, res, pathname, url) {
 
   if (pathname === '/api/instructor/students' && method === 'GET') {
     if (!auth.requireInstructor(req, res, sendJSON)) return;
-    // It is a roster of students: instructors browsing their own class don't
-    // belong in it. Computed live, so the list follows INSTRUCTOR_EMAILS.
-    const students = store.listStudents().filter(s => auth.roleFor(s.email) !== 'instructor');
+    // It is a roster of students, so instructors browsing their own class don't
+    // belong in it: an email one follows INSTRUCTOR_EMAILS live, a class-code
+    // one is flagged on their profile because they have no email to match.
+    const students = store.listStudents().filter(s => !s.ins && auth.roleFor(s.email) !== 'instructor');
     return sendJSON(res, 200, { students });
   }
 
@@ -244,6 +245,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/callback' && req.method === 'GET') return auth.finishLogin(req, res, url.searchParams);
     if (pathname === '/auth/logout') return auth.logout(req, res);
     if (pathname === '/auth/dev' && req.method === 'GET') return auth.devLogin(req, res, url.searchParams);
+    if (pathname === '/auth/class' && req.method === 'POST') {
+      if (!auth.csrfOk(req)) return sendJSON(res, 403, { error: 'bad origin' });
+      return auth.classLogin(req, res, await readBody(req), sendJSON);
+    }
 
     if (pathname.startsWith('/api/')) return await handleApi(req, res, pathname, url);
 
@@ -263,6 +268,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`  listening on 0.0.0.0:${PORT}`);
   console.log(`  data:        ${store.DATA_DIR}`);
   console.log(`  AI reviewer: ${ai.describe()}`);
-  console.log(`  sign-in:     ${auth.msalConfigured() ? 'Microsoft (' + auth.publicBaseUrl() + '/auth/callback)' : 'DEV LOGIN ONLY — /auth/dev'}`);
+  console.log(`  sign-in:     ${auth.describeSignIn()}`);
   console.log('');
 });
