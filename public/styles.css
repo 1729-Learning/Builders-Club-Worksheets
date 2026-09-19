@@ -457,3 +457,52 @@ footer.foot .line{font-family:var(--font-mono);font-size:11px;color:var(--muted)
 .ws-fold[open] .wf-head{border-bottom:3px dashed var(--hair);border-radius:11px 11px 0 0}
 .wf-body{padding:6px 16px 16px}
 .wf-body .section{box-shadow:var(--shadow-sm)}
+
+/* ----- signed-in identity, sign-in gate, and the instructor's viewing banner -----
+
+   The rules below set display on elements that also carry the `hidden`
+   attribute, and an author rule beats the browser's own [hidden] styling — so
+   say it here once, or the sign-out pill and banners would never hide. */
+[hidden]{display:none !important}
+/* identity pill + gate + banners */
+.who{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:12px;font-weight:700;
+  border:2px solid var(--ink);background:var(--surface);border-radius:999px;padding:5px 11px;
+  box-shadow:var(--shadow-sm);white-space:nowrap}
+.who-out{color:var(--accent-h);text-decoration:underline;cursor:pointer}
+
+/* Links styled as buttons — the base classes were written for <button>. */
+a.btn,a.ask-btn{text-decoration:none;display:inline-flex;align-items:center}
+.login-err{color:var(--red-deep)}
+
+/* Signed out: the stats and the gear have nothing to show yet. */
+body.anon .stat,body.anon .gear-btn,body.anon .who{display:none}
+
+.auth-banner,.view-banner{border-top:2px solid var(--ink);font-family:var(--font-mono);font-size:12px;
+  font-weight:700;padding:7px 20px;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap}
+.auth-banner{background:var(--coral-tint)}
+.auth-banner a{color:var(--accent-h)}
+.view-banner{background:var(--yellow)}
+.view-banner a{color:var(--ink)}
+
+/* An instructor reading a student's work: every control that would write is
+   removed outright, rather than left visible and dead. */
+body.readonly [data-review],body.readonly [data-savejournal],body.readonly [data-saveboard],
+body.readonly [data-redo],body.readonly [data-redostep],body.readonly [data-unmaster],
+body.readonly [data-copyprompt],body.readonly [data-copypractice],body.readonly [data-boardadd],
+body.readonly [data-boarddel],body.readonly [data-listadd],body.readonly [data-listdel],
+body.readonly .li-add-row,body.readonly .redo-btn{display:none}
+body.readonly textarea.answer,body.readonly .li-input,body.readonly .bd-card{background:var(--pad-2);cursor:default}
+
+/* ----- instructor roster ----- */
+.table-wrap{overflow-x:auto;margin-top:14px}
+.roster{width:100%;border-collapse:collapse;font-size:14px}
+.roster th{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:8px 10px;border-bottom:2.5px solid var(--ink);white-space:nowrap}
+.roster td{padding:10px;border-bottom:1px solid var(--hair)}
+.roster tbody tr{cursor:pointer}
+.roster tbody tr:hover{background:var(--blue-tint)}
+.roster .r-num{font-family:var(--font-mono);font-weight:700;white-space:nowrap}
+.roster .r-name{font-family:var(--font-display)}
+
+@media(max-width:640px){.roster .r-email{display:none}}
+@media(max-width:480px){.who-name{display:none}}

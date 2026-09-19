@@ -6,3 +6,6 @@ data/
 
 # Just in case dependencies ever get added
 node_modules/
+
+# Local env files
+.env
