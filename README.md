@@ -6,7 +6,7 @@ Interactive semester worksheets for Builders Club, with **AI review** built in. 
 
 Every submission is reviewed against the step's rubric by **Claude** (Anthropic) or **Codex** (OpenAI). It runs as a website, so:
 
-- **Students install nothing.** They open a link and sign in, either with a class code you share or with their school Microsoft account.
+- **Students install nothing.** They open a link and sign in with a Microsoft account — their school's or a personal one.
 - **One set of API keys.** The instructor sets them once on the server; students never see or need a key.
 - **No database.** Each student's progress is a JSON file on a persistent disk.
 
@@ -15,12 +15,10 @@ Every submission is reviewed against the step's rubric by **Claude** (Anthropic)
 ## For students
 
 1. Open the link your instructor gave you.
-2. Sign in. Depending on how your instructor set it up, that is either the **class code** they gave you plus your own name, or your **school Microsoft account**.
+2. Click **Sign in with Microsoft** and use your school account, or a personal Microsoft account if you'd rather.
 3. Work through the sections.
 
-If you sign in with a class code, **type your name the same way every time** — your name is how your work is found again. Capitals and extra spaces don't matter, but "Jamie Chen" and "Jamie C" are two different people as far as the site is concerned.
-
-That's the whole setup. A few things worth knowing:
+Sign in with the same account every time and your work is always there. That's the whole setup. A few things worth knowing:
 
 - **Your answers save themselves** as you type — there is no save button for drafts, and you can close the tab whenever you like.
 - **It works on a phone or a laptop**, and you can switch between them. Your work follows your account, not the device.
@@ -37,81 +35,52 @@ To hand work in or keep a copy, open **⚙ Settings → Download Builder file**.
 
 ## For instructors: deploying on Railway
 
-You need a Railway project, at least one AI API key, and a way for students to sign in. There are two, and you can run both at once:
+You need three things: an app registration for sign-in, a Railway project, and an AI API key.
 
-| | Class code | School Microsoft accounts |
-|---|---|---|
-| Setup | Two environment variables | An Entra ID app registration, usually via school IT |
-| Students type | A shared code and their name | Their normal school email and password |
-| Identity | The name they type | Their real school account |
-| Good for | Getting started this week | The whole semester, if IT will grant it |
+**Nothing is required from your school, or from any student's school.** The app registration lives in your own directory. Students at any organization sign in with the account they already have, and their IT department never registers, configures or approves anything. If a student's school happens to block unapproved apps for its own accounts, that student can sign in with a personal Microsoft account instead.
 
-Start with the class code if you don't already have Entra access — you can add Microsoft later without anyone losing work, since the two can run side by side.
+### 1. Register the app
 
-### Option A: class code (no IT needed)
+You can do this with **any** Microsoft account, including a free personal one — you don't need school Azure access. In the [Azure portal](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **New registration**:
 
-Set three variables on the service and you're done:
-
-```
-CLASS_CODE=Builders Club
-INSTRUCTOR_CODE=<a private code only you use>
-SESSION_SECRET=<openssl rand -hex 32>
-```
-
-Students go to the site, type the class code and their name, and start working. You sign in the same way but with `INSTRUCTOR_CODE` instead, which is what unlocks the student roster.
-
-The class code is meant to be shared and isn't a secret. `INSTRUCTOR_CODE` is: treat it like a password, make it at least 10 characters, and keep it to yourself. If it ever leaks, changing it signs out every instructor session it granted. Wrong codes are rate-limited, so guessing is impractical.
-
-What this does and doesn't give you: students keep separate progress and it takes two minutes to set up, but a name is the only proof of identity, so a student who types a classmate's name would open that classmate's worksheets. For a club worksheet app that is usually a fair trade; if it isn't for you, use Microsoft accounts below.
-
-### Option B: school Microsoft accounts
-
-#### 1. Register the app in Microsoft Entra ID
-
-In the [Azure portal](https://portal.azure.com) → **Microsoft Entra ID** → **App registrations** → **New registration**:
-
-- **Supported account types:** *Accounts in this organizational directory only* — single tenant, so only your school's accounts can sign in.
-- **Redirect URI:** platform **Web**, value `https://YOUR-APP.up.railway.app/auth/callback`. You get the real domain in step 2; come back and set it then.
-- After creating it, note the **Application (client) ID** and **Directory (tenant) ID** from the Overview page.
+- **Supported account types:** *Accounts in any organizational directory (any Microsoft Entra ID tenant — Multitenant) **and** personal Microsoft accounts.* This is the setting that makes it work for everyone without their IT involved.
+- **Redirect URI:** platform **Web**, value `https://YOUR-APP.up.railway.app/auth/callback`. You get the real domain in step 2; come back and fill it in then.
+- From the Overview page, copy the **Application (client) ID**.
 - Under **Certificates & secrets** → **New client secret**, copy the secret **Value** (not the Secret ID — the value is shown only once).
 
-If **New registration** is greyed out or you get an "insufficient privileges" error, your tenant doesn't let you do this and school IT has to. What to ask them for: *a single-tenant app registration for a web app, with redirect URI `https://OUR-URL/auth/callback`, and a client secret.* You need the tenant ID, client ID and secret value back.
+You do not need to add API permissions. The app asks only for `openid`, `profile` and `email`, which are the basic sign-in scopes and need no admin consent.
 
 ### 2. Create the Railway service
 
 1. New project → **Deploy from GitHub repo** → pick this repository.
-2. **Settings → Networking → Generate Domain.** That URL is your `PUBLIC_BASE_URL`. Put `PUBLIC_BASE_URL/auth/callback` into the Entra redirect URI from step 1.
-3. **Add a Volume** to the service and mount it at `/data`. Without it, every student's work is erased on the next deploy.
+2. **Settings → Networking → Generate Domain.** Put that domain plus `/auth/callback` into the redirect URI from step 1.
+3. **Add a Volume** and mount it at `/data`. Without it, every student's work is erased on the next deploy.
 4. Leave the service at **1 replica**. Student work is files on that one volume, so a second replica would race on writes.
 
 ### 3. Set the variables
 
-Copy what you need from [`.env.example`](.env.example). With a class code, the whole list is:
+In the service's **Variables** tab. Paste values raw, with no quotes:
 
 ```
-CLASS_CODE=Builders Club
-INSTRUCTOR_CODE=<a private code only you use>
+MS_CLIENT_ID=<Application (client) ID>
+MS_CLIENT_SECRET=<the secret Value>
 SESSION_SECRET=<openssl rand -hex 32>
+INSTRUCTOR_EMAILS=you@school.edu
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-With Microsoft accounts, swap the two codes for:
+That's the whole list. Railway supplies `PORT`, the volume path and the public domain itself.
 
-```
-MS_TENANT_ID=...
-MS_CLIENT_ID=...
-MS_CLIENT_SECRET=...
-INSTRUCTOR_EMAILS=you@school.edu
-PUBLIC_BASE_URL=https://YOUR-APP.up.railway.app
-```
+**Leave `MS_TENANT_ID` unset.** That's what makes sign-in work for any Microsoft account. Setting it restricts sign-in to that one directory, which you'd only want if every student is guaranteed to have an account there.
 
-Railway sets `PORT`, `RAILWAY_VOLUME_MOUNT_PATH` and the public domain itself, so `PUBLIC_BASE_URL` is only needed for Microsoft sign-in or a custom domain. Redeploy after saving.
+Optionally set `ALLOWED_EMAIL_DOMAINS=yourschool.edu` to limit who can get in. Without it, anyone with a Microsoft account can sign in and start their own worksheets, which also means they can spend your AI budget. The per-student daily cap limits the damage, but the domain list is the real gate.
 
 ### 4. Check it
 
 - `https://YOUR-APP.up.railway.app/healthz` returns `{"ok":true}`.
-- Sign in as yourself — with `INSTRUCTOR_CODE`, or with a school account whose email is in `INSTRUCTOR_EMAILS`. Either way a **👥** button appears in the top bar.
-- The deploy logs name the reviewer and the sign-in mode at boot, and print one line per AI call with its token counts — that is your running cost.
+- The deploy log names the sign-in mode. You want: `Microsoft — any Microsoft account`.
+- Sign in as yourself. Because your email is in `INSTRUCTOR_EMAILS`, a **👥** button appears in the top bar.
+- The log prints one line per AI call with its token counts — that's your running cost.
 
 ### The student roster
 
@@ -163,10 +132,10 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 | `PUBLIC_BASE_URL` | Railway's domain | Public https origin. Builds the Microsoft redirect URI and decides whether cookies are `Secure`. Filled in from `RAILWAY_PUBLIC_DOMAIN` on Railway. |
 | `SESSION_SECRET` | — | Signs session cookies. Required in production; changing it signs everyone out. |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts. |
-| `CLASS_CODE` | — | The code students type to sign in. Setting it enables class-code sign-in. |
-| `INSTRUCTOR_CODE` | — | Your private code; signing in with it opens the roster. Required alongside `CLASS_CODE`, and must differ from it. |
-| `MS_TENANT_ID` / `MS_CLIENT_ID` / `MS_CLIENT_SECRET` | — | The Entra app registration. |
-| `INSTRUCTOR_EMAILS` | empty | Comma-separated emails that get the roster, for Microsoft sign-in. Case-insensitive, re-read on every request. |
+| `MS_CLIENT_ID` / `MS_CLIENT_SECRET` | — | The app registration. Both required. |
+| `MS_TENANT_ID` | multi-tenant | Leave unset so any Microsoft account can sign in. A Directory (tenant) ID restricts sign-in to that directory. |
+| `ALLOWED_EMAIL_DOMAINS` | empty | Comma-separated domains allowed to sign in; subdomains included. Empty allows any account. |
+| `INSTRUCTOR_EMAILS` | empty | Comma-separated emails that get the roster. Case-insensitive, re-read on every request. |
 | `ANTHROPIC_API_KEY` | — | Enables the Claude engine. |
 | `OPENAI_API_KEY` | — | Enables the Codex (OpenAI) engine. |
 | `REVIEW_BACKEND` | `auto` | Default engine: `claude`, `codex`, or `auto`. Students can switch only when both keys are set. |
@@ -185,14 +154,14 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 
 | Symptom | Fix |
 |---|---|
-| Sign-in bounces back with an error | The redirect URI on the Entra app must match `PUBLIC_BASE_URL/auth/callback` exactly. Check the deploy logs for the reason. |
-| "Use the one your school gave you" | That was a personal Microsoft account. The app is single-tenant by design. |
+| Sign-in bounces back with an error | The redirect URI on the app registration must match your domain plus `/auth/callback` exactly. The deploy log gives the reason. |
+| Only accounts from one directory work | `MS_TENANT_ID` is set. Clear it for multi-tenant. |
 | Reviews say the reviewer is unavailable | No API key set, a key that's invalid or out of credit, or that student hit `REVIEW_DAILY_CAP`. The logs say which. |
 | A student's progress vanished after a deploy | The Volume isn't attached, or `DATA_DIR` points somewhere off it. Check the `data:` line in the boot log. |
-| 👥 button missing | With a class code, you signed in with `CLASS_CODE` instead of `INSTRUCTOR_CODE`; sign out and back in. With Microsoft, that email isn't in `INSTRUCTOR_EMAILS`, which is re-read per request, so just reload after fixing it. |
-| "That class code doesn't look right" | Check `CLASS_CODE` on the service. Capitals and extra spaces are ignored, so only the letters have to match. |
-| A student can't find their work | They typed a different name than last time. Ask them exactly what they typed; the roster shows every name that has signed in. |
-| Server won't start at all | It refuses to run with no sign-in configured. The boot log lists the three variables for each option. |
+| 👥 button missing | That email isn't in `INSTRUCTOR_EMAILS`. It's re-read per request, so just reload after fixing it. Check it matches the address the sign-in actually returned. |
+| A student sees "Need admin approval" | Their school blocks unapproved apps for its own accounts. They can sign in with a personal Microsoft account instead. |
+| "That account isn't on your instructor's list" | `ALLOWED_EMAIL_DOMAINS` doesn't include their address's domain. |
+| Server won't start at all | It refuses to run with no sign-in configured. The boot log names each variable it needs and shows which ones it can currently see. |
 | Students see a spinner for a long time | Reviews are queued behind `AI_CONCURRENCY`. Raise it if your rate limits allow. |
 | Someone wants a clean slate | ⚙ Settings → Danger zone → Hard reset. It only touches that one account. |
 

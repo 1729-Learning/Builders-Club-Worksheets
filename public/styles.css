@@ -507,9 +507,3 @@ body.readonly textarea.answer,body.readonly .li-input,body.readonly .bd-card{bac
 @media(max-width:640px){.roster .r-email{display:none}}
 @media(max-width:480px){.who-name{display:none}}
 
-/* ----- class-code sign-in form ----- */
-.signin-form{display:flex;flex-direction:column;gap:6px;margin-top:16px}
-.signin-form .field-label{margin-top:8px}
-.signin-input{width:100%;min-height:0;height:auto;font-family:var(--font-body);font-size:16px;padding:11px 13px;
-  border:2.5px solid var(--ink);border-radius:var(--radius-sm);background:var(--pad-2);box-shadow:var(--shadow-sm)}
-.signin-input:focus{outline:none;background:#fff;box-shadow:var(--shadow-h)}
