@@ -2229,49 +2229,27 @@ function wire() {
 
 /* Signed out. The worksheets themselves say nothing about who you are, so this
    is the whole gate: one button that hands off to Microsoft. */
-function renderLogin({ devLogin, microsoft, classLogin, configured, problem }) {
+function renderLogin({ devLogin, microsoft, configured, problem }) {
   document.body.classList.add('anon');
   const note = {
     failed: 'That sign-in didn\u2019t go through. Try again, and tell your instructor if it keeps happening.',
     expired: 'That sign-in took too long and expired. Give it another go.',
-    tenant: 'That looks like a personal Microsoft account. Use the one your school gave you.',
+    tenant: 'That account isn\u2019t part of the directory this site accepts. Use the account your instructor told you to.',
+    domain: 'That account isn\u2019t on your instructor\u2019s list. Sign in with your school address, or ask them to add you.',
     unconfigured: 'Sign-in isn\u2019t set up on this site yet \u2014 your instructor needs to finish configuring it.',
-    // A specific failure always beats the generic "not set up" note, which the
-    // card below already says in full.
+    // A tenant that blocks unapproved apps sends people back without a token.
+    consent: 'Your school blocked this app for school accounts. Sign in with a personal Microsoft account instead, or ask your instructor.',
   }[problem || (configured === false ? 'unconfigured' : '')];
 
-  /* Class code: the student types a code their instructor shared plus their own
-     name. The name is how their work is found again, so the hint says so. */
-  const classCard = `
+  const signInCard = `
     <section class="section is-active">
       <div class="sec-headtext">
         <div class="sec-kicker">SIGN IN</div>
-        <h2 class="sec-title">Enter your class code</h2>
+        <h2 class="sec-title">Use your Microsoft account</h2>
       </div>
-      <p class="sec-tagline">Your instructor shared a class code. Type it with your own name \u2014 your name is how your work is saved, so use the same one every time.</p>
-      <form class="signin-form" id="classForm" autocomplete="on">
-        <label class="field-label" for="classCode">Class code</label>
-        <input class="answer signin-input" id="classCode" name="classCode" type="text"
-               placeholder="the code your instructor gave you" autocomplete="off" autocapitalize="none" required>
-        <label class="field-label" for="classNameInput">Your name</label>
-        <input class="answer signin-input" id="classNameInput" name="name" type="text"
-               placeholder="first and last name" autocomplete="name" autocapitalize="words" required>
-        <p class="sec-tagline login-err" id="classError" hidden></p>
-        <div class="answer-tools">
-          <button class="btn" type="submit" id="classSubmit">Start working \u25b8</button>
-        </div>
-      </form>
-    </section>`;
-
-  const microsoftCard = `
-    <section class="section is-active">
-      <div class="sec-headtext">
-        <div class="sec-kicker">${classLogin ? 'OR SIGN IN WITH' : 'SIGN IN'}</div>
-        <h2 class="sec-title">Use your school Microsoft account</h2>
-      </div>
-      <p class="sec-tagline">The same email and password you use for school. We keep your name, your email, and your worksheet answers \u2014 nothing else.</p>
+      <p class="sec-tagline">Your school account, or a personal Microsoft account \u2014 either works. We keep your name, your email, and your worksheet answers, and nothing else.</p>
       <div class="answer-tools">
-        <a class="btn${classLogin ? ' white' : ''}" href="/auth/login">Sign in with your school account \u25b8</a>
+        <a class="btn" href="/auth/login">Sign in with Microsoft \u25b8</a>
       </div>
     </section>`;
 
@@ -2291,48 +2269,8 @@ function renderLogin({ devLogin, microsoft, classLogin, configured, problem }) {
       <p>Scaffolded worksheets with an AI reviewer built in. Sign in and pick up exactly where you left off \u2014 your answers save themselves as you type.</p>
     </section>
     ${note ? `<section class="section is-active"><p class="sec-tagline login-err">${esc(note)}</p></section>` : ''}
-    ${classLogin ? classCard : ''}
-    ${microsoft ? microsoftCard : ''}
-    ${!classLogin && !microsoft ? nothingCard : ''}
+    ${microsoft ? signInCard : nothingCard}
     ${devLogin ? '<div class="answer-tools"><a class="ask-btn" href="/auth/dev" title="Local development only \u2014 add ?as=name for another test student">Dev sign-in</a></div>' : ''}`;
-
-  const form = document.getElementById('classForm');
-  if (form) form.addEventListener('submit', submitClassLogin);
-}
-
-async function submitClassLogin(e) {
-  e.preventDefault();
-  const code = document.getElementById('classCode');
-  const name = document.getElementById('classNameInput');
-  const err = document.getElementById('classError');
-  const btn = document.getElementById('classSubmit');
-  const showError = msg => { if (err) { err.textContent = msg; err.hidden = false; } };
-
-  if (err) err.hidden = true;
-  btn.disabled = true;
-  btn.textContent = 'Signing in\u2026';
-
-  let res, body;
-  try {
-    res = await fetch('/auth/class', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: code.value, name: name.value }),
-    });
-    body = await res.json().catch(() => ({}));
-  } catch {
-    btn.disabled = false; btn.textContent = 'Start working \u25b8';
-    return showError('Couldn\u2019t reach the server \u2014 check your connection and try again.');
-  }
-
-  if (!res.ok) {
-    btn.disabled = false; btn.textContent = 'Start working \u25b8';
-    // A wrong code is the common case, so keep focus where the fix is.
-    if (res.status === 401 && code) { code.focus(); code.select(); }
-    return showError(body.error || 'That didn\u2019t work. Check the code and your name, then try again.');
-  }
-
-  // The cookie is set; a reload boots straight into the worksheets.
-  location.replace('/');
 }
 
 /* Something went wrong that reloading might fix. Deliberately does NOT invent an
@@ -2399,7 +2337,6 @@ async function boot() {
     return renderLogin({
       devLogin: !!who.devLogin,
       microsoft: !!who.microsoft,
-      classLogin: !!who.classLogin,
       configured: who.configured,
       problem,
     });
@@ -2414,7 +2351,7 @@ async function boot() {
       // The session went away between /api/me and here — ask who we are again
       // so the page offers whichever sign-in methods this site has.
       const again = await fetchMe().catch(() => ({}));
-      return renderLogin({ devLogin: !!again.devLogin, microsoft: !!again.microsoft, classLogin: !!again.classLogin, configured: again.configured });
+      return renderLogin({ devLogin: !!again.devLogin, microsoft: !!again.microsoft, configured: again.configured });
     }
     return renderFatal('We couldn\u2019t load your work just now. Reload the page \u2014 nothing has been changed.');
   }

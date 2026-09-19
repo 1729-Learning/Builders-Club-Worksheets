@@ -126,8 +126,8 @@ async function handleApi(req, res, pathname, url) {
   if (pathname === '/api/instructor/students' && method === 'GET') {
     if (!auth.requireInstructor(req, res, sendJSON)) return;
     // It is a roster of students, so instructors browsing their own class don't
-    // belong in it: an email one follows INSTRUCTOR_EMAILS live, a class-code
-    // one is flagged on their profile because they have no email to match.
+    // belong in it. Computed live, so the list follows INSTRUCTOR_EMAILS; the
+    // `ins` flag keeps any profile left over from the class-code era out too.
     const students = store.listStudents().filter(s => !s.ins && auth.roleFor(s.email) !== 'instructor');
     return sendJSON(res, 200, { students });
   }
@@ -245,10 +245,6 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/auth/callback' && req.method === 'GET') return auth.finishLogin(req, res, url.searchParams);
     if (pathname === '/auth/logout') return auth.logout(req, res);
     if (pathname === '/auth/dev' && req.method === 'GET') return auth.devLogin(req, res, url.searchParams);
-    if (pathname === '/auth/class' && req.method === 'POST') {
-      if (!auth.csrfOk(req)) return sendJSON(res, 403, { error: 'bad origin' });
-      return auth.classLogin(req, res, await readBody(req), sendJSON);
-    }
 
     if (pathname.startsWith('/api/')) return await handleApi(req, res, pathname, url);
 
