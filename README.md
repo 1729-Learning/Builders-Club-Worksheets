@@ -54,7 +54,7 @@ You do not need to add API permissions. The app asks only for `openid`, `profile
 
 1. New project → **Deploy from GitHub repo** → pick this repository.
 2. **Settings → Networking → Generate Domain.** Put that domain plus `/auth/callback` into the redirect URI from step 1.
-3. **Add a Volume** and mount it at `/data`. Without it, every student's work is erased on the next deploy.
+3. **Add a Volume** and mount it at `/data`, then turn on a **daily backup schedule** for it. Without the volume, every student's work is erased on the next deploy — the server refuses to start rather than let that happen quietly. Without the backups, a semester of work sits on one undefended disk; note that wiping a volume deletes its backups with it, and a deleted volume is recoverable for 48 hours via an emailed link.
 4. Leave the service at **1 replica**. Student work is files on that one volume, so a second replica would race on writes.
 
 ### 3. Set the variables
@@ -77,7 +77,8 @@ Optionally set `ALLOWED_EMAIL_DOMAINS=yourschool.edu` to limit who can get in. W
 
 ### 4. Check it
 
-- `https://YOUR-APP.up.railway.app/healthz` returns `{"ok":true}`.
+- `https://YOUR-APP.up.railway.app/healthz` returns `{"ok":true}` plus a `storage` block naming the path it writes to and whether that path is persistent and writable.
+- The boot log's `data:` line should show your volume's mount path (`/data`), not a path under `/app`.
 - The deploy log names the sign-in mode. You want: `Microsoft — any Microsoft account`.
 - Sign in as yourself. Because your email is in `INSTRUCTOR_EMAILS`, a **👥** button appears in the top bar.
 - The log prints one line per AI call with its token counts — that's your running cost.
@@ -145,7 +146,8 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 | `AI_TIMEOUT_MS` | `300000` | Per-request timeout. |
 | `AI_CONCURRENCY` | `4` | Simultaneous AI calls across all students; the rest queue. |
 | `REVIEW_DAILY_CAP` | `60` | AI calls per student per day. `0` disables the cap. |
-| `DATA_DIR` | volume, else `./data` | Where per-student JSON lives. |
+| `DATA_DIR` | volume, else `./data` | Where per-student JSON lives. Leave empty when deployed so the Volume is used. |
+| `ALLOW_EPHEMERAL_DATA` | unset | `1` lets the server start with no persistent disk, erasing all work on each deploy. Throwaway demos only. |
 | `ALLOW_DEV_LOGIN` | unset | `1` enables `/auth/dev` locally. Ignored in production. |
 
 ---
@@ -157,11 +159,11 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 | Sign-in bounces back with an error | The redirect URI on the app registration must match your domain plus `/auth/callback` exactly. The deploy log gives the reason. |
 | Only accounts from one directory work | `MS_TENANT_ID` is set. Clear it for multi-tenant. |
 | Reviews say the reviewer is unavailable | No API key set, a key that's invalid or out of credit, or that student hit `REVIEW_DAILY_CAP`. The logs say which. |
-| A student's progress vanished after a deploy | The Volume isn't attached, or `DATA_DIR` points somewhere off it. Check the `data:` line in the boot log. |
+| A student's progress vanished after a deploy | The Volume isn't attached, or `DATA_DIR` points somewhere off it. The server now refuses to start in the first case and warns in the second; check the `data:` line in the boot log against your mount path. |
 | 👥 button missing | That email isn't in `INSTRUCTOR_EMAILS`. It's re-read per request, so just reload after fixing it. Check it matches the address the sign-in actually returned. |
 | A student sees "Need admin approval" | Their school blocks unapproved apps for its own accounts. They can sign in with a personal Microsoft account instead. |
 | "That account isn't on your instructor's list" | `ALLOWED_EMAIL_DOMAINS` doesn't include their address's domain. |
-| Server won't start at all | It refuses to run with no sign-in configured. The boot log names each variable it needs and shows which ones it can currently see. |
+| Server won't start at all | It refuses to run with no sign-in configured, with no persistent disk, or when it cannot write to `DATA_DIR`. The boot log names the cause, the variables it needs, and which ones it can currently see. |
 | Students see a spinner for a long time | Reviews are queued behind `AI_CONCURRENCY`. Raise it if your rate limits allow. |
 | Someone wants a clean slate | ⚙ Settings → Danger zone → Hard reset. It only touches that one account. |
 
