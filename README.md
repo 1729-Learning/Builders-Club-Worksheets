@@ -54,7 +54,7 @@ You do not need to add API permissions. The app asks only for `openid`, `profile
 
 1. New project → **Deploy from GitHub repo** → pick this repository.
 2. **Settings → Networking → Generate Domain.** Put that domain plus `/auth/callback` into the redirect URI from step 1.
-3. **Add a Volume** and mount it at `/data`, then turn on a **daily backup schedule** for it. Without the volume, every student's work is erased on the next deploy — the server refuses to start rather than let that happen quietly. Without the backups, a semester of work sits on one undefended disk; note that wiping a volume deletes its backups with it, and a deleted volume is recoverable for 48 hours via an emailed link.
+3. **Add a Volume** and mount it at `/data`. Without it, every student's work is erased on the next deploy — the server refuses to start rather than let that happen quietly. If your plan offers volume backups, turn on a **daily schedule**; either way, download a **class backup** from the roster page now and then (see below), because that copy is the one that doesn't live on the same platform as the thing it's backing up.
 4. Leave the service at **1 replica**. Student work is files on that one volume, so a second replica would race on writes.
 
 ### 3. Set the variables
@@ -85,7 +85,15 @@ Optionally set `ALLOWED_EMAIL_DOMAINS=yourschool.edu` to limit who can get in. W
 
 ### The student roster
 
-**👥** lists everyone who has signed in: steps done, XP, artifacts, and when they were last active. Click a row to read that student's worksheets exactly as they see them, read-only — nothing you do while viewing can change their work. The **⬇** button downloads any student's Builder file.
+**👥** lists everyone who has signed in: steps done, XP, artifacts, and when they were last active. Click a row to read that student's worksheets exactly as they see them, read-only — nothing you do while viewing can change their work. The **⬇** button on a row downloads that student's Builder file.
+
+### Backing up the class
+
+At the bottom of the roster, **⬇ Download class backup** writes one JSON file holding every student's answers, XP, artifacts and review threads. It is the whole semester in a file you keep yourself — no platform feature, no plan tier, nothing to configure. Take one at the end of each week and put it somewhere that isn't this server.
+
+**⬆ Restore class backup** puts one back. It is additive and reversible: a student the file doesn't mention is untouched, and each student it does restore gets a snapshot of their current work taken first, so ⚙ Settings → Restore a backup can undo it per student. Use it after a volume is lost or when standing the site up somewhere new — sign in as yourself on the empty service and upload the file.
+
+Snapshots, volume backups and class backups protect different things and don't replace each other: snapshots undo one student's mistake, volume backups are the platform's copy of the disk, and a class backup is yours. Note that wiping a volume deletes its backups with it, and a deleted volume is recoverable for 48 hours via an emailed link.
 
 ### Updating worksheets
 
@@ -160,6 +168,7 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 | Only accounts from one directory work | `MS_TENANT_ID` is set. Clear it for multi-tenant. |
 | Reviews say the reviewer is unavailable | No API key set, a key that's invalid or out of credit, or that student hit `REVIEW_DAILY_CAP`. The logs say which. |
 | A student's progress vanished after a deploy | The Volume isn't attached, or `DATA_DIR` points somewhere off it. The server now refuses to start in the first case and warns in the second; check the `data:` line in the boot log against your mount path. |
+| Everyone's work is gone and there's no volume backup | Sign in as yourself and upload your most recent **class backup** on the roster page. Work done since that file was downloaded is not in it. |
 | 👥 button missing | That email isn't in `INSTRUCTOR_EMAILS`. It's re-read per request, so just reload after fixing it. Check it matches the address the sign-in actually returned. |
 | A student sees "Need admin approval" | Their school blocks unapproved apps for its own accounts. They can sign in with a personal Microsoft account instead. |
 | "That account isn't on your instructor's list" | `ALLOWED_EMAIL_DOMAINS` doesn't include their address's domain. |
