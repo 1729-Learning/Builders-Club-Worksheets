@@ -178,6 +178,8 @@ node test/run.js --only=grid --verbose
 
 The suite covers the curriculum's two-layer XP model, the state-to-record adapter, every number the dashboard shows, and the grid's six cell states. Fixtures are built from the real curriculum rather than written by hand, so a mistyped step id can't make a check pass for the wrong reason.
 
+GitHub Actions runs three things on every pull request, on Node 20 and 22: that every `.js` file parses, that the server boots and all its routes answer, and the suite itself. The first two exist because the suite can't see everything — the `dash-*.js` files are only ever loaded by a browser, and a missing export inside a route handler is invisible until that route runs.
+
 ---
 
 ## Configuration reference
