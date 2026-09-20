@@ -59,14 +59,27 @@ function sendJSON(res, code, obj) {
   res.end(body);
 }
 
-function readBody(req) {
+/* Buffers are concatenated rather than appended to a string: a multi-byte
+   character split across two chunks would otherwise decode to replacement
+   characters, quietly mangling an accented name or an emoji. */
+function readBody(req, maxBytes = 2_000_000) {
   return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', c => { data += c; if (data.length > 2_000_000) { reject(new Error('body too large')); req.destroy(); } });
-    req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } });
+    const chunks = [];
+    let size = 0;
+    req.on('data', c => {
+      size += c.length;
+      if (size > maxBytes) { reject(new Error('body too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      try { resolve(size ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); } catch (e) { reject(e); }
+    });
     req.on('error', reject);
   });
 }
+
+// A whole class in one upload is far bigger than any single save.
+const ARCHIVE_MAX_BYTES = 64_000_000;
 
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -130,6 +143,33 @@ async function handleApi(req, res, pathname, url) {
     // `ins` flag keeps any profile left over from the class-code era out too.
     const students = store.listStudents().filter(s => !s.ins && auth.roleFor(s.email) !== 'instructor');
     return sendJSON(res, 200, { students });
+  }
+
+  /* The class archive: every student's work in one file, so a backup exists
+     that doesn't depend on the hosting platform's own backup feature. */
+  if (pathname === '/api/instructor/archive' && method === 'GET') {
+    if (!auth.requireInstructor(req, res, sendJSON)) return;
+    const body = JSON.stringify(store.exportArchive());
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Length': Buffer.byteLength(body),
+      'Content-Disposition': `attachment; filename="builders-club-class-${stamp}.json"`,
+      'Cache-Control': 'no-store',
+    });
+    return res.end(body);
+  }
+
+  if (pathname === '/api/instructor/archive' && method === 'POST') {
+    const who = auth.requireInstructor(req, res, sendJSON);
+    if (!who) return;
+    let archive;
+    try { archive = await readBody(req, ARCHIVE_MAX_BYTES); }
+    catch { return sendJSON(res, 400, { error: 'that file is too large, or not valid JSON' }); }
+    const result = store.importArchive(archive);
+    if (!result.ok) return sendJSON(res, 400, { error: result.error });
+    console.log(`[restore] ${who.email} restored ${result.restored} student(s) from an archive, ${result.skipped} skipped`);
+    return sendJSON(res, 200, result);
   }
 
   const studentState = pathname.match(/^\/api\/instructor\/students\/([^/]+)\/state$/);

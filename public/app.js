@@ -469,7 +469,65 @@ async function renderRoster() {
           <td class="r-num" title="${esc(new Date(st.lastSeen || 0).toLocaleString())}">${esc(ago(st.lastSeen))}</td>
           <td><button class="ask-btn" data-dl="${esc(st.oid)}" title="Download this student\u2019s Builder file">\u2b07</button></td>
         </tr>`).join('')}</tbody>
-    </table></div>`;
+    </table></div>
+    <div class="backup-row">
+      <button class="btn" data-classexport>\u2b07 Download class backup</button>
+      <button class="btn white" data-classimport>\u2b06 Restore class backup</button>
+      <input type="file" id="classArchiveFile" accept=".json,application/json" style="display:none">
+    </div>
+    <p class="sec-tagline">The backup is one file holding every student\u2019s work. Keep a copy somewhere that isn\u2019t this server.</p>`;
+}
+
+/* The class archive is the instructor's own copy of the semester, independent of
+   whatever the hosting platform does or doesn't back up. */
+async function downloadClassArchive(btn) {
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '\u2026';
+  try {
+    const blob = await (await api('/api/instructor/archive')).blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `builders-club-class-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    if (e.name !== 'AuthError') alert('Couldn\u2019t build the class backup \u2014 check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+
+async function restoreClassArchive(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // allow picking the same file again later
+  if (!file) return;
+  let archive = null;
+  try { archive = JSON.parse(await file.text()); } catch { /* handled below */ }
+  const n = archive && Array.isArray(archive.students) ? archive.students.length : 0;
+  if (!archive || archive.kind !== 'builders-club-class-archive' || !n) {
+    alert('That doesn\u2019t look like a class backup \u2014 pick the .json file downloaded from this page.');
+    return;
+  }
+  const when = archive.exportedAt ? new Date(archive.exportedAt).toLocaleString() : 'an unknown date';
+  if (!confirm(`Restore ${n} student${n === 1 ? '' : 's'} from the backup taken ${when}?\n\n`
+    + 'Their current work is replaced by what is in the file. A snapshot of it is kept first, so each student can still roll back. '
+    + 'Students the file doesn\u2019t mention are left alone.')) return;
+  try {
+    const out = await (await api('/api/instructor/archive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(archive),
+    })).json();
+    if (out.error) { alert(out.error); return; }
+    alert(`Restored ${out.restored} student${out.restored === 1 ? '' : 's'}.`
+      + (out.skipped ? ` ${out.skipped} entr${out.skipped === 1 ? 'y was' : 'ies were'} skipped as unreadable.` : ''));
+    rosterCache = null;
+    renderRoster();
+  } catch (e) {
+    if (e.name !== 'AuthError') alert('The restore didn\u2019t go through \u2014 check your connection and try again.');
+  }
 }
 
 function showViewBanner() {
@@ -535,7 +593,7 @@ function leaveViewingAs() {
 const MUTATING_SEL = '[data-review],[data-savejournal],[data-saveboard],[data-redo],[data-redostep],'
   + '[data-unmaster],[data-copyprompt],[data-copypractice],[data-boardadd],[data-boarddel],'
   + '[data-listadd],[data-listdel],[data-importmd],[data-showbackups],[data-restorebackup],'
-  + '[data-hardreset],[data-freeroam],[data-backend]';
+  + '[data-hardreset],[data-freeroam],[data-backend],[data-classimport]';
 
 /* ---------------------------------------------------------------- settings view */
 
@@ -2041,6 +2099,12 @@ function wire() {
     const ims = e.target.closest('[data-importmd]');
     if (ims) { const inp = document.getElementById('importFile'); if (inp) inp.click(); return; }
 
+    const cex = e.target.closest('[data-classexport]');
+    if (cex) { downloadClassArchive(cex); return; }
+
+    const cim = e.target.closest('[data-classimport]');
+    if (cim) { const inp = document.getElementById('classArchiveFile'); if (inp) inp.click(); return; }
+
     const shb = e.target.closest('[data-showbackups]');
     if (shb) { showBackupList(); return; }
 
@@ -2141,6 +2205,7 @@ function wire() {
   // The hidden file input on the Settings page (upload a Builder file).
   document.addEventListener('change', e => {
     if (e.target && e.target.id === 'importFile') importBuilderFile(e.target);
+    if (e.target && e.target.id === 'classArchiveFile') restoreClassArchive(e.target);
   });
 
   // Persist drafts as they type — plain answers, list rows, and board cards.
