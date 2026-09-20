@@ -4,10 +4,13 @@
   "private": true,
   "description": "Interactive semester worksheets for Builders Club, with AI review built in.",
   "type": "commonjs",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "ALLOW_DEV_LOGIN=1 node server.js"
+    "dev": "ALLOW_DEV_LOGIN=1 node server.js",
+    "test": "node test/run.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

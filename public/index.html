@@ -46,7 +46,7 @@
   </div>
   <div class="view-banner" id="viewBanner" hidden>
     <span>👁 Viewing <b id="viewName"></b> (read-only)</span>
-    <a href="#/instructor">Back to roster</a>
+    <a href="#/instructor">Back to the class</a>
     <button class="ask-btn" data-export>⬇ Builder file</button>
   </div>
 </header>
@@ -55,9 +55,21 @@
 
 <button class="totop" id="toTop" title="Back to top" aria-label="Back to top">↑</button>
 
+<!-- Classic scripts sharing one global scope, so the order IS the dependency
+     graph: content.js defines the curriculum, curriculum.js indexes it, the
+     dash-* files are the instructor dashboard, and app.js boots everything. -->
 <script src="./gears.js"></script>
 <script src="./content.js"></script>
+<script src="./curriculum.js"></script>
 <script src="./video.js"></script>
+<script src="./dash-aggregate.js"></script>
+<script src="./dash-ui.js"></script>
+<script src="./dash-store.js"></script>
+<script src="./dash-class.js"></script>
+<script src="./dash-steps.js"></script>
+<script src="./dash-builder.js"></script>
+<script src="./dash-xp.js"></script>
+<script src="./dash-app.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

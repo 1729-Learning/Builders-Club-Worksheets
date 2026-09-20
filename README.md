@@ -54,7 +54,7 @@ You do not need to add API permissions. The app asks only for `openid`, `profile
 
 1. New project → **Deploy from GitHub repo** → pick this repository.
 2. **Settings → Networking → Generate Domain.** Put that domain plus `/auth/callback` into the redirect URI from step 1.
-3. **Add a Volume** and mount it at `/data`. Without it, every student's work is erased on the next deploy — the server refuses to start rather than let that happen quietly. If your plan offers volume backups, turn on a **daily schedule**; either way, download a **class backup** from the roster page now and then (see below), because that copy is the one that doesn't live on the same platform as the thing it's backing up.
+3. **Add a Volume** and mount it at `/data`. Without it, every student's work is erased on the next deploy — the server refuses to start rather than let that happen quietly. If your plan offers volume backups, turn on a **daily schedule**; either way, download a **class backup** from the dashboard now and then (see below), because that copy is the one that doesn't live on the same platform as the thing it's backing up.
 4. Leave the service at **1 replica**. Student work is files on that one volume, so a second replica would race on writes.
 
 ### 3. Set the variables
@@ -80,22 +80,62 @@ Optionally set `ALLOWED_EMAIL_DOMAINS=yourschool.edu` to limit who can get in. W
 - `https://YOUR-APP.up.railway.app/healthz` returns `{"ok":true}` plus a `storage` block naming the path it writes to and whether that path is persistent and writable.
 - The boot log's `data:` line should show your volume's mount path (`/data`), not a path under `/app`.
 - The deploy log names the sign-in mode. You want: `Microsoft — any Microsoft account`.
-- Sign in as yourself. Because your email is in `INSTRUCTOR_EMAILS`, a **👥** button appears in the top bar.
+- Sign in as yourself. Because your email is in `INSTRUCTOR_EMAILS`, a **👥** button appears in the top bar — that's the dashboard.
 - The log prints one line per AI call with its token counts — that's your running cost.
 
-### The student roster
+## The instructor dashboard
 
-**👥** lists everyone who has signed in: steps done, XP, artifacts, and when they were last active. Click a row to read that student's worksheets exactly as they see them, read-only — nothing you do while viewing can change their work. The **⬇** button on a row downloads that student's Builder file.
+**👥** opens it. Five screens over the same live data — there is nothing to download, import or refresh.
+
+| Screen | Use it to |
+|---|---|
+| **Class** | See everyone at once. Every builder is a row, every core step a column. Click a cell to read that step across the class, a name for that builder, a section number for that section. **Board** and **List** re-sort the same people by who needs you today. |
+| **Steps** | Find the step the class is failing. *Taking the most attempts* ranks by how many tries the work takes; *People sitting on them now* ranks by how many are stuck there this minute. |
+| **One step** | Read every answer to one question in one scroll, with the rubric beside them, and every earlier attempt with what the AI said. This is the screen for session prep and marking. |
+| **A builder** | Everything one student wrote, section by section. **Print one-pager** gives you a sheet for a 1:1; **Read their worksheets** opens their account exactly as they see it, read-only. |
+| **XP** | The leaderboard, plus **Copy CSV** for a gradebook. |
+
+### Reading the class grid
+
+| | |
+|---|---|
+| **Green** | done |
+| **Green with a slash** | Builders AI let them skip it — **this earns no XP** |
+| **Blue** | in progress |
+| **Coral** | stuck: three or more rejected attempts. Coral only ever means "a human should look at this" |
+| **White** | not started, but unlocked |
+| **Pale** | not unlocked yet — they couldn't have reached it |
+| **Notch in the corner** | passed, but it took three or more tries |
+
+The number on the right is how many steps from the class median someone is. It is a position, not a grade, and it makes no claim about how hard anyone worked.
+
+### Things it deliberately doesn't do
+
+**No streak.** Students see one; this doesn't. It counts *distinct days on which XP was earned*, not consecutive ones, and it never resets — so someone who worked in January and again in August shows a "2-day streak". Ranking a class by a number that doesn't mean what it says would be worse than showing nothing.
+
+**No attempts figure per builder.** Attempts belong to a step. Three attempts on a hard synthesis step is better work than one on an easy exercise, so a per-builder average would quietly punish the builders who revise — the opposite of what the program teaches. You see attempts against steps, and against a builder's individual answers, never as their score.
+
+**No time on task, and no predicted finish date.** The data carries when a step was finished and nothing about how long it took, so anything about hours or pace would be invented.
+
+**No dash where a zero would lie.** Only 29 of the 88 steps are graded by an AI, so the rest show `—` for attempts rather than `0`, which would read as "trivially easy" about a step nobody ever graded.
+
+### XP, and why it may differ from the student's
+
+XP is recomputed from the work rather than read off the student's running total, because a step pays its own XP **plus** its section's bonus when it's the step that finishes the section — 1020 of the 2480 available. Where the two disagree you get an `xp mismatch` pill, which usually means a redo, an import, or an older version of the worksheets.
+
+Steps the AI let a builder skip pay nothing, so two builders at the same point in the course can be a couple of hundred XP apart through no fault of either. The leaderboard says so, permanently, under its title.
+
+> The **One step** screen shows the rubrics — the answer keys the AI marks against. That's fine for you and your mentors; it's a reason not to hand anyone your sign-in.
 
 ### Backing up the class
 
-At the bottom of the roster, **⬇ Download class backup** writes one JSON file holding every student's answers, XP, artifacts and review threads. It is the whole semester in a file you keep yourself — no platform feature, no plan tier, nothing to configure. Take one at the end of each week and put it somewhere that isn't this server.
+At the bottom of the Class screen, **⬇ Download class backup** writes one JSON file holding every student's answers, XP, artifacts and review threads. It is the whole semester in a file you keep yourself — no platform feature, no plan tier, nothing to configure. Take one at the end of each week and put it somewhere that isn't this server.
 
 **⬆ Restore class backup** puts one back. It is additive and reversible: a student the file doesn't mention is untouched, and each student it does restore gets a snapshot of their current work taken first, so ⚙ Settings → Restore a backup can undo it per student. Use it after a volume is lost or when standing the site up somewhere new — sign in as yourself on the empty service and upload the file.
 
 Snapshots, volume backups and class backups protect different things and don't replace each other: snapshots undo one student's mistake, volume backups are the platform's copy of the disk, and a class backup is yours. Note that wiping a volume deletes its backups with it, and a deleted volume is recoverable for 48 hours via an emailed link.
 
-### Updating worksheets
+## Updating worksheets
 
 Push to the repository. Railway redeploys and the new content is live immediately; student work on the volume is untouched.
 
@@ -124,12 +164,19 @@ ALLOW_DEV_LOGIN=1 npm start
 
 Open <http://localhost:4321> and click **Dev sign-in**. No Entra tenant needed.
 
-- `/auth/dev?as=alex` signs in as a second student — useful for filling a roster.
-- `/auth/dev?as=instructor` plus `INSTRUCTOR_EMAILS=instructor@dev.local` gives you the roster view.
+- `/auth/dev?as=alex` signs in as a second student — useful for filling a class.
+- `/auth/dev?as=instructor` plus `INSTRUCTOR_EMAILS=instructor@dev.local` gives you the dashboard.
 - Add `ANTHROPIC_API_KEY=...` to test real reviews; without a key, reviews show a friendly "not set up yet" notice and everything else still works.
 - Data lands in `./data/`, which git ignores.
 
 Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so it cannot be reached on a deployed site.
+
+```bash
+npm test          # 39 checks, no dependencies
+node test/run.js --only=grid --verbose
+```
+
+The suite covers the curriculum's two-layer XP model, the state-to-record adapter, every number the dashboard shows, and the grid's six cell states. Fixtures are built from the real curriculum rather than written by hand, so a mistyped step id can't make a check pass for the wrong reason.
 
 ---
 
@@ -144,7 +191,7 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 | `MS_CLIENT_ID` / `MS_CLIENT_SECRET` | — | The app registration. Both required. |
 | `MS_TENANT_ID` | multi-tenant | Leave unset so any Microsoft account can sign in. A Directory (tenant) ID restricts sign-in to that directory. |
 | `ALLOWED_EMAIL_DOMAINS` | empty | Comma-separated domains allowed to sign in; subdomains included. Empty allows any account. |
-| `INSTRUCTOR_EMAILS` | empty | Comma-separated emails that get the roster. Case-insensitive, re-read on every request. |
+| `INSTRUCTOR_EMAILS` | empty | Comma-separated emails that get the dashboard. Case-insensitive, re-read on every request. |
 | `ANTHROPIC_API_KEY` | — | Enables the Claude engine. |
 | `OPENAI_API_KEY` | — | Enables the Codex (OpenAI) engine. |
 | `REVIEW_BACKEND` | `auto` | Default engine: `claude`, `codex`, or `auto`. Students can switch only when both keys are set. |
@@ -168,7 +215,7 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 | Only accounts from one directory work | `MS_TENANT_ID` is set. Clear it for multi-tenant. |
 | Reviews say the reviewer is unavailable | No API key set, a key that's invalid or out of credit, or that student hit `REVIEW_DAILY_CAP`. The logs say which. |
 | A student's progress vanished after a deploy | The Volume isn't attached, or `DATA_DIR` points somewhere off it. The server now refuses to start in the first case and warns in the second; check the `data:` line in the boot log against your mount path. |
-| Everyone's work is gone and there's no volume backup | Sign in as yourself and upload your most recent **class backup** on the roster page. Work done since that file was downloaded is not in it. |
+| Everyone's work is gone and there's no volume backup | Sign in as yourself and upload your most recent **class backup** from the dashboard. Work done since that file was downloaded is not in it. |
 | 👥 button missing | That email isn't in `INSTRUCTOR_EMAILS`. It's re-read per request, so just reload after fixing it. Check it matches the address the sign-in actually returned. |
 | A student sees "Need admin approval" | Their school blocks unapproved apps for its own accounts. They can sign in with a personal Microsoft account instead. |
 | "That account isn't on your instructor's list" | `ALLOWED_EMAIL_DOMAINS` doesn't include their address's domain. |
@@ -182,4 +229,10 @@ Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so
 
 All worksheet content — worksheets, sections, steps, video segments, rubrics, role-plays — lives in [`content.js`](content.js). **Adding a worksheet is config, not code.** Video segments reference YouTube IDs with `start`/`end` times; swap them freely.
 
-The server ([`server.js`](server.js)) serves the static app and routes requests; the work is in [`lib/`](lib): `prompts.js` (the review persona and every prompt, as pure functions), `store.js` (per-student state, snapshots, profiles), `ai.js` (provider calls plus concurrency, single-flight and daily caps), and `auth.js` (Microsoft sign-in and signed session cookies). The front-end ([`public/app.js`](public/app.js)) is a hash-routed single-page app, no framework, no build step.
+[`curriculum.js`](curriculum.js) projects that content into the flat, decided shape the dashboard wants — XP defaults applied, rubrics split into lines, every step given a stable `sectionId/stepId` key. It runs in both the browser and Node, and never mutates `WORKSHEETS`.
+
+The server ([`server.js`](server.js)) serves the static app and routes requests; the work is in [`lib/`](lib): `prompts.js` (the review persona and every prompt, as pure functions), `store.js` (per-student state, snapshots, profiles), `ai.js` (provider calls plus concurrency, single-flight and daily caps), `auth.js` (Microsoft sign-in and signed session cookies), and `records.js` (one student's stored state, shaped into the record the dashboard reads).
+
+The front-end is a hash-routed single-page app — no framework, no build step, classic `<script>` tags whose order in [`index.html`](public/index.html) is the dependency graph. [`public/app.js`](public/app.js) is the student's worksheets; the `dash-*.js` files are the instructor's dashboard, kept separate so the two halves don't grow into each other: `dash-aggregate.js` (every number, as pure functions), `dash-ui.js` (HTML-string helpers), `dash-store.js` (what's loaded and how), `dash-app.js` (its router), and one file per screen.
+
+Three instructor endpoints feed it. `/api/instructor/class` carries **numbers only** — the grid, the step rankings and the leaderboard show nobody's writing, so nobody's writing is sent. `/api/instructor/record/:oid` and `/api/instructor/step/:section/:step` fetch prose for the one screen that will display it.
