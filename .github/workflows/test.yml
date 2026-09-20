@@ -1,0 +1,108 @@
+# Runs on every pull request and every push to main.
+#
+# Three checks, in the order they catch things:
+#
+#   1. Every .js file parses. The test suite only require()s the server and the
+#      two shared modules; the dash-*.js files are loaded by a browser and
+#      nothing else, so a typo in one would otherwise reach an instructor's
+#      screen with no warning at all.
+#   2. The server boots and every route answers. A missing export or a typo
+#      inside a route handler is invisible both to node --check and to a bare
+#      /healthz — it surfaces only when that route actually runs.
+#   3. npm test — the suite itself.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor from package.json engines, and current. The floor is the one
+        # that catches a newer Node API sneaking in.
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # Also proves the lockfile is valid and installable, which is what Railway
+      # does on every deploy.
+      - run: npm ci
+
+      - name: Every file parses
+        run: |
+          for f in $(git ls-files '*.js'); do
+            node --check "$f" || { echo "::error file=$f::does not parse"; exit 1; }
+          done
+
+      - name: The server boots and every route answers
+        env:
+          ALLOW_DEV_LOGIN: '1'
+          INSTRUCTOR_EMAILS: instructor@dev.local
+          DATA_DIR: ${{ runner.temp }}/data
+          PORT: '4321'
+        run: |
+          set -euo pipefail
+          B=http://localhost:4321
+          JAR="$RUNNER_TEMP/cookies"
+
+          node server.js > "$RUNNER_TEMP/server.log" 2>&1 &
+          for _ in $(seq 1 40); do
+            curl -sf "$B/healthz" > "$RUNNER_TEMP/health.json" && break
+            sleep 0.25
+          done
+          cat "$RUNNER_TEMP/server.log"
+
+          grep -q '"ok":true' "$RUNNER_TEMP/health.json" \
+            || { echo "::error::the server did not come up"; exit 1; }
+          grep -q '"writable":true' "$RUNNER_TEMP/health.json" \
+            || { echo "::error::it came up but cannot write to its data directory"; exit 1; }
+
+          # Walk the routes as an instructor. A missing export or a typo inside a
+          # handler is invisible to node --check and to a bare /healthz — it only
+          # shows up when the route actually runs, which is to say in front of a
+          # student. So run them here instead.
+          curl -sf -c "$JAR" "$B/auth/dev?as=instructor" -o /dev/null
+          curl -sf -b "$JAR" -X POST "$B/api/state" -H "Origin: $B" \
+            -H 'Content-Type: application/json' -d '{"steps":{},"artifacts":{},"mastery":{},"xp":0}' -o /dev/null
+
+          OID=$(curl -sf -b "$JAR" "$B/api/me" | node -e \
+            'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>console.log(JSON.parse(d).oid))')
+          KEY=$(node -e 'const C=require("./curriculum.js");console.log(C.coreStepKeys[0])')
+
+          fail=0
+          for route in \
+            "/api/me" "/api/state" "/api/settings" "/api/backups" \
+            "/api/instructor/students" "/api/instructor/class" \
+            "/api/instructor/record/$OID" "/api/instructor/step/${KEY%%/*}/${KEY##*/}" \
+            "/api/instructor/archive"
+          do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$B$route")
+            printf '  %-55s %s\n' "$route" "$code"
+            [ "$code" = "200" ] || fail=1
+          done
+
+          # And a signed-out caller must not reach any of it.
+          for route in "/api/instructor/class" "/api/instructor/students"; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$B$route")
+            printf '  %-55s %s (signed out)\n' "$route" "$code"
+            [ "$code" = "401" ] || fail=1
+          done
+
+          if [ "$fail" != "0" ]; then
+            echo "::error::a route did not answer as expected"
+            cat "$RUNNER_TEMP/server.log"
+            exit 1
+          fi
+
+      - run: npm test
