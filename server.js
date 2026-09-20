@@ -238,8 +238,11 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const { pathname } = url;
 
-    // Railway's health check. No auth: it runs before anyone signs in.
-    if (pathname === '/healthz') return sendJSON(res, 200, { ok: true });
+    /* Railway's health check. No auth: it runs before anyone signs in.
+       Reports storage but never fails on it — restarting cannot conjure a
+       volume, and a failing health check would only roll back a deploy whose
+       configuration the boot check has already refused. */
+    if (pathname === '/healthz') return sendJSON(res, 200, { ok: true, storage: store.storageStatus() });
 
     if (pathname === '/auth/login' && req.method === 'GET') return auth.beginLogin(req, res);
     if (pathname === '/auth/callback' && req.method === 'GET') return auth.finishLogin(req, res, url.searchParams);
@@ -258,6 +261,8 @@ const server = http.createServer(async (req, res) => {
 /* ---------------------------------------------------------------- boot */
 
 auth.validateAuthEnvOrExit();
+// Before the port opens, not on the first student's first save.
+store.validateStorageOrExit();
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  Builders Club · semester worksheets`);
