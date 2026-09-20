@@ -33,9 +33,13 @@ const prompts = require('./lib/prompts.js');
 const store = require('./lib/store.js');
 const ai = require('./lib/ai.js');
 const auth = require('./lib/auth.js');
+const records = require('./lib/records.js');
+const curriculum = require('./curriculum.js');
 
 const PORT = Number(process.env.PORT || 4321);
 const PUBLIC_DIR = path.join(__dirname, 'public');
+// content.js is the curriculum; curriculum.js is the dashboard's index over it.
+const SHARED_ROOT_FILES = new Set(['/content.js', '/curriculum.js']);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -84,11 +88,12 @@ const ARCHIVE_MAX_BYTES = 64_000_000;
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (urlPath === '/') urlPath = '/index.html';
-  // content.js is shared with the server, so it lives in the project root
-  // rather than public/ — serve it from there.
-  const isContent = urlPath === '/content.js';
-  const filePath = isContent ? path.join(__dirname, 'content.js') : path.join(PUBLIC_DIR, urlPath);
-  if (!isContent && !filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('forbidden'); }
+  // Two files are shared between the browser and the server, so they live in the
+  // project root rather than public/ — serve them from there. Exact matches only,
+  // which is what keeps the traversal guard below honest.
+  const isShared = SHARED_ROOT_FILES.has(urlPath);
+  const filePath = isShared ? path.join(__dirname, urlPath.slice(1)) : path.join(PUBLIC_DIR, urlPath);
+  if (!isShared && !filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('forbidden'); }
   fs.readFile(filePath, (err, buf) => {
     if (err) { res.writeHead(404); return res.end('not found'); }
     res.writeHead(200, {
@@ -119,6 +124,16 @@ function settingsPayload(oid) {
   };
 }
 
+/* Everyone who has signed in, shaped for the dashboard, minus the instructors —
+   an instructor browsing their own class doesn't belong in it. A class is a few
+   dozen folders, so reading them per request stays cheaper than keeping a cache
+   honest; that is the same bet listStudents already makes. */
+function classRecords() {
+  return store.exportArchive().students
+    .filter(s => !(s.profile || {}).ins && auth.roleFor((s.profile || {}).email) !== 'instructor')
+    .map(s => records.toRecord({ oid: s.oid, state: s.state, profile: s.profile, settings: s.settings }));
+}
+
 /* ---------------------------------------------------------------- routes */
 
 async function handleApi(req, res, pathname, url) {
@@ -143,6 +158,48 @@ async function handleApi(req, res, pathname, url) {
     // `ins` flag keeps any profile left over from the class-code era out too.
     const students = store.listStudents().filter(s => !s.ins && auth.roleFor(s.email) !== 'instructor');
     return sendJSON(res, 200, { students });
+  }
+
+  /* ---- the dashboard ---- */
+
+  /* The whole class, numbers only. This is what the grid, the step rankings and
+     the leaderboard run on, and none of them shows a word of anyone's writing —
+     so none of their writing is sent. */
+  if (pathname === '/api/instructor/class' && method === 'GET') {
+    if (!auth.requireInstructor(req, res, sendJSON)) return;
+    return sendJSON(res, 200, { students: classRecords().map(records.digest) });
+  }
+
+  /* One student, everything they wrote. The builder screen needs the prose and
+     the review threads, which the class-wide digest deliberately leaves out. */
+  const oneRecord = pathname.match(/^\/api\/instructor\/record\/([^/]+)$/);
+  if (oneRecord && method === 'GET') {
+    if (!auth.requireInstructor(req, res, sendJSON)) return;
+    const oid = decodeURIComponent(oneRecord[1]);
+    if (!store.isOid(oid)) return sendJSON(res, 400, { error: 'bad student id' });
+    if (!store.studentExists(oid)) return sendJSON(res, 404, { error: 'unknown student' });
+    return sendJSON(res, 200, records.toRecord({
+      oid,
+      state: store.readState(oid),
+      profile: store.readProfile(oid),
+      settings: store.readSettings(oid),
+    }));
+  }
+
+  /* One step, every answer to it. Prose, but for one question at a time rather
+     than the whole class at once. */
+  const oneStep = pathname.match(/^\/api\/instructor\/step\/([^/]+)\/([^/]+)$/);
+  if (oneStep && method === 'GET') {
+    if (!auth.requireInstructor(req, res, sendJSON)) return;
+    const key = decodeURIComponent(oneStep[1]) + '/' + decodeURIComponent(oneStep[2]);
+    if (!curriculum.stepByKey(key)) return sendJSON(res, 404, { error: 'unknown step' });
+    const entries = classRecords()
+      .map(rec => ({
+        oid: rec.rosterId,
+        name: rec.displayName,
+        step: rec.steps[key] || null,
+      }));
+    return sendJSON(res, 200, { key, entries });
   }
 
   /* The class archive: every student's work in one file, so a backup exists

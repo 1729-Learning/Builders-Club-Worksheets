@@ -221,14 +221,19 @@ function renderRoute() {
   const newRoute = h !== lastRouteHash;
   lastRouteHash = h;
   const startAtTop = () => { if (newRoute) window.scrollTo({ top: 0, behavior: 'instant' }); };
+  // The dashboard puts this back when it renders; every other view is narrower.
+  $('#view').classList.remove('dash-page');
 
+  /* Everything under #/instructor belongs to the dashboard (public/dash-app.js),
+     with one exception: reading a student's worksheets exactly as they see them
+     is the student renderer's job, so it stays here. */
   if (h.startsWith('#/instructor')) {
     if (!me || me.role !== 'instructor') { location.hash = '#/'; return; }
-    const m2 = h.match(/^#\/instructor\/([\w-]+)/);
-    if (m2) { enterViewingAs(m2[1]); return; }
+    const read = h.match(/^#\/instructor\/read\/([\w-]+)/)
+      || h.match(/^#\/instructor\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    if (read) { enterViewingAs(read[1]); return; }
     leaveViewingAs();
-    renderRoster();
-    startAtTop();
+    dashApp.render();
     return;
   }
 
@@ -403,81 +408,6 @@ async function loadRoster() {
   return rosterCache;
 }
 
-function ago(ts) {
-  if (!ts) return 'never';
-  const mins = Math.floor((Date.now() - ts) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return mins + ' min ago';
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return hrs + ' h ago';
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return days + ' day' + (days === 1 ? '' : 's') + ' ago';
-  return new Date(ts).toLocaleDateString();
-}
-
-// Denominators for the roster, counted the same way the header does: the bonus
-// shelf is not part of the semester.
-function semesterTotals() {
-  let steps = 0, sections = 0;
-  for (const w of WORKSHEETS) {
-    if (w.extra) continue;
-    sections += w.sections.length;
-    for (const sec of w.sections) steps += sec.steps.length;
-  }
-  return { steps, sections };
-}
-
-async function renderRoster() {
-  const view = $('#view');
-  view.classList.remove('wide');
-  view.innerHTML = `
-    <div class="flow-topbar"><a class="crumb" href="#/">\u25c2 Worksheets</a></div>
-    <section class="hero compact"><h1>Students</h1></section>
-    <section class="section is-active" id="roster-card"><p class="sec-tagline">Loading\u2026</p></section>`;
-
-  let students;
-  try { students = await loadRoster(); }
-  catch (e) {
-    const card = $('#roster-card');
-    if (card) card.innerHTML = `<p class="sec-tagline">${e.name === 'AuthError' ? 'Your sign-in expired \u2014 sign in again to see the roster.' : 'Couldn\u2019t load the roster \u2014 check your connection and try again.'}</p>`;
-    return;
-  }
-
-  const card = $('#roster-card');
-  if (!card) return; // navigated away while loading
-  if (!students.length) {
-    card.innerHTML = '<p class="sec-tagline">No students have signed in yet.</p>';
-    return;
-  }
-
-  const totals = semesterTotals();
-  // Class-code students have no email, so that column would be dead space.
-  const anyEmail = students.some(st => st.email);
-  card.innerHTML = `
-    <p class="sec-tagline">${students.length} student${students.length === 1 ? '' : 's'} signed in so far \u00b7 click anyone to read their worksheets</p>
-    <div class="table-wrap"><table class="roster">
-      <thead><tr>
-        <th>Name</th>${anyEmail ? '<th class="r-email">Email</th>' : ''}<th>Steps</th><th>XP</th><th>Artifacts</th><th>Last seen</th><th></th>
-      </tr></thead>
-      <tbody>${students.map(st => `
-        <tr data-student="${esc(st.oid)}">
-          <td class="r-name">${esc(st.name)}</td>
-          ${anyEmail ? `<td class="r-email">${esc(st.email)}</td>` : ''}
-          <td class="r-num">${st.stepsDone}/${totals.steps}</td>
-          <td class="r-num">${st.xp}</td>
-          <td class="r-num">${st.artifacts}/${totals.sections}</td>
-          <td class="r-num" title="${esc(new Date(st.lastSeen || 0).toLocaleString())}">${esc(ago(st.lastSeen))}</td>
-          <td><button class="ask-btn" data-dl="${esc(st.oid)}" title="Download this student\u2019s Builder file">\u2b07</button></td>
-        </tr>`).join('')}</tbody>
-    </table></div>
-    <div class="backup-row">
-      <button class="btn" data-classexport>\u2b07 Download class backup</button>
-      <button class="btn white" data-classimport>\u2b06 Restore class backup</button>
-      <input type="file" id="classArchiveFile" accept=".json,application/json" style="display:none">
-    </div>
-    <p class="sec-tagline">The backup is one file holding every student\u2019s work. Keep a copy somewhere that isn\u2019t this server.</p>`;
-}
-
 /* The class archive is the instructor's own copy of the semester, independent of
    whatever the hosting platform does or doesn't back up. */
 async function downloadClassArchive(btn) {
@@ -524,7 +454,8 @@ async function restoreClassArchive(input) {
     alert(`Restored ${out.restored} student${out.restored === 1 ? '' : 's'}.`
       + (out.skipped ? ` ${out.skipped} entr${out.skipped === 1 ? 'y was' : 'ies were'} skipped as unreadable.` : ''));
     rosterCache = null;
-    renderRoster();
+    dashApp.invalidate();
+    dashApp.render();
   } catch (e) {
     if (e.name !== 'AuthError') alert('The restore didn\u2019t go through \u2014 check your connection and try again.');
   }
@@ -1463,6 +1394,9 @@ function completeVideo(section, step) {
   const st = stepState(k);
   if (st.status === 'done') return;
   st.status = 'done';
+  // When it was finished. Only AI-reviewed steps ever carried a time, on their
+  // verdict; the dashboard wants one from every kind of step.
+  st.doneAt = Date.now();
   awardStepXP(st, step.xp || 20, section);
   saveState(true);
   setTimeout(() => advanceFocus(section), 600);
@@ -1498,6 +1432,7 @@ function saveJournal(section, step) {
     st.answer = val;
   }
   st.status = 'done';
+  st.doneAt = Date.now();
   let gained = step.xp || 15;
   if (step.isArtifact) { // walkthrough artifacts (e.g. the live link) are journal steps
     state.artifacts[section.id] = st.answer;
@@ -1540,6 +1475,7 @@ function saveBoard(section, step) {
 
   if (!boardMeetsMinimums(k, step, st)) return;
   st.status = 'done';
+  st.doneAt = Date.now();
   awardStepXP(st, step.xp || 15, section);
   saveState(true);
   if (wasDone) {
@@ -1712,6 +1648,7 @@ async function submitReviewInner(section, step) {
     const m = { role: 'agent', kind: 'good', text: '**Requirements met ✓**\n' + verdict.feedback, reasons: verdict.reasons };
     st.thread.push(m); setLatest(k, bubbleHTML(m));
     st.status = 'done';
+    st.doneAt = Date.now();
     let gained = step.xp || 30;
     if (step.isArtifact) {
       state.artifacts[section.id] = st.answer;
@@ -1923,6 +1860,7 @@ function redoStep(k) {
   st.thread = [];
   delete st.verdict;
   delete st.lastFeedback;
+  delete st.doneAt;
   if (step.type === 'video') { delete st.maxWatched; delete st.watchedSeconds; st.answer = ''; }
   // Redoing a synthesis step means "assemble me a fresh draft from my current work" —
   // clear the old draft and the once-only flag so the auto-draft fires again.
@@ -2435,6 +2373,7 @@ async function boot() {
   G.initScrollGears();
 
   wire();
+  dashApp.boot({ api });
   showWho();
   route();
   // The web fonts land after the first render and change how the text wraps,
