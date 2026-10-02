@@ -137,7 +137,7 @@ const MVP_WORKSHEET = {
           title: 'Transform 3 problems into problem statements',
           buildsOn: ['problem-statement/pick-top-5'],
           resources: [{ title: 'Paul Graham — How to Get Startup Ideas', url: 'https://paulgraham.com/startupideas.html', note: 'The essay behind this whole section: why "noticing" beats "brainstorming".' }],
-          prompt: 'Take all THREE problems from your top 3 (pinned below) and rewrite each as a real problem statement — one per box: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. If one refuses to fit the format, that\'s a clue it isn\'t a strong problem — rework it rather than force it.',
+          prompt: 'Rewrite THREE problems as real problem statements, one per box: [specific person] struggles to [do X] because [root cause], which costs them [consequence]. Your top 3 are pinned below. Use them, or swap in any problem you\'d rather work on, even one that isn\'t on your list. If one refuses to fit the format, that\'s a clue it isn\'t a strong problem — rework it rather than force it.',
           listAnswer: { min: 3, max: 3, itemLabel: 'Statement', placeholder: '[specific person] struggles to [do X] because [root cause], which costs them [consequence]' },
           xp: 30,
           lessonPanel: {
@@ -145,7 +145,7 @@ const MVP_WORKSHEET = {
             good: 'Student tutors struggle to schedule sessions because requests arrive by text, email, and hallway conversations, which costs them about three no-shows a week.',
             bad: 'We should make an app so students save money. <em>(that\'s a pitch — the problem is hidden and a solution is baked in)</em>',
           },
-          rubric: `- Contains THREE distinct problem statements drawn from the student's own listed problems (not new invented ones)
+          rubric: `- Contains THREE distinct problem statements — any problems the student chooses; they do NOT have to come from the student's earlier lists
 - Each names a SPECIFIC person or narrow group (not "people", "students", "everyone")
 - Each has a struggle, a root cause, and a concrete consequence/cost
 - None of them contains a solution, product, or app idea
