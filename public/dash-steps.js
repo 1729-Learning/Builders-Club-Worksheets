@@ -245,7 +245,7 @@ var viewSteps = (function () {
     const st = e.st;
     const stuck = st.status === 'inProgress' && st.attempts >= aggregate.THRESHOLDS.STUCK_ATTEMPTS;
     const cls = st.status === 'done' ? 'is-done' : st.status === 'mastered' ? 'is-mastered' : stuck ? 'is-stuck' : 'is-open';
-    const meta = st.status === 'done' ? `passed on attempt ${st.attempts || 1}${st.completedOn ? ` · ${ui.day(st.completedOn)}` : ''} · ${st.answerWords} words`
+    const meta = st.status === 'done' ? `${st.approvedBy === 'instructor' ? `approved by the instructor after ${st.attempts} attempt${st.attempts === 1 ? '' : 's'}` : `passed on attempt ${st.attempts || 1}`}${st.completedOn ? ` · ${ui.day(st.completedOn)}` : ''} · ${st.answerWords} words`
       : st.status === 'mastered' ? 'skipped by Builders AI · no XP'
       : `${st.attempts} attempt${st.attempts === 1 ? '' : 's'} so far · not accepted yet`;
 

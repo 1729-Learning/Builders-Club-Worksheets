@@ -492,6 +492,102 @@ check('grid unlocks the next section only once the artifact is earned', () => {
   assert.strictEqual(cellFor(next.steps[0].key, rec('Q', partial)).state, 'notStarted');
 });
 
+/* ------------------------------------------------------------------ approvals */
+
+group('approvals');
+
+const approvals = require('../lib/approvals.js');
+const { findStep } = require('../lib/prompts.js');
+
+// Real steps, picked from the curriculum: a reviewed one that isn't an
+// artifact, a reviewed artifact, and a reviewed step on the extras shelf.
+const coreWs = WORKSHEETS.filter(w => !w.extra);
+const pickStep = (wsList, pred) => {
+  for (const w of wsList) for (const s of w.sections) for (const st of s.steps) if (pred(st)) return findStep(s.id, st.id);
+  return null;
+};
+const plainStep = pickStep(coreWs, st => st.rubric && !st.isArtifact);
+const artifactStep = pickStep(coreWs, st => st.rubric && st.isArtifact);
+const extraStep = pickStep(WORKSHEETS.filter(w => w.extra), st => st.rubric);
+const keyFor = f => f.section.id + '/' + f.step.id;
+const stuckOn = (f, extra) => ({
+  xp: 100, steps: { [keyFor(f)]: { status: 'pending', answer: 'my answer', attempts: 4, thread: [] } }, artifacts: {}, mastery: {}, ...extra,
+});
+const approval = (f, id = 'a1') => ({ id, key: keyFor(f), by: 'teacher@school.edu', ts: 1700000000000, note: 'Good enough — move on.' });
+
+check('approvals only offer steps the AI reviews', () => {
+  assert.ok(approvals.isApprovable(plainStep.step));
+  const video = pickStep(WORKSHEETS, st => st.type === 'video');
+  assert.ok(!approvals.isApprovable(video.step));
+});
+
+check('approvals mark the step passed by the instructor and award its XP', () => {
+  const s = approvals.applyApproval(stuckOn(plainStep), plainStep, approval(plainStep));
+  const st = s.steps[keyFor(plainStep)];
+  assert.strictEqual(st.status, 'done');
+  assert.deepStrictEqual(st.verdict, { pass: true, ts: 1700000000000, by: 'instructor' });
+  assert.strictEqual(st.thread[st.thread.length - 1].by, 'instructor');
+  assert.ok(st.thread[st.thread.length - 1].text.includes('Good enough'));
+  assert.strictEqual(s.xp, 100 + (plainStep.step.xp || 30));
+  assert.ok(s.approvalsSeen.a1);
+});
+
+check('approvals pay XP once, even for a step earned before a redo', () => {
+  const s = stuckOn(plainStep);
+  s.steps[keyFor(plainStep)].xpAwarded = true;
+  approvals.applyApproval(s, plainStep, approval(plainStep));
+  assert.strictEqual(s.xp, 100);
+});
+
+check('approvals mint the artifact for an artifact step', () => {
+  const s = approvals.applyApproval(stuckOn(artifactStep), artifactStep, approval(artifactStep));
+  assert.strictEqual(s.artifacts[artifactStep.section.id], 'my answer');
+  assert.strictEqual(s.xp, 100 + (artifactStep.step.xp || 30) + (artifactStep.section.xp || 0));
+});
+
+check('approvals pay nothing on the extras shelf', () => {
+  if (!extraStep) return;
+  const s = approvals.applyApproval(stuckOn(extraStep), extraStep, approval(extraStep));
+  assert.strictEqual(s.steps[keyFor(extraStep)].status, 'done');
+  assert.strictEqual(s.xp, 100);
+});
+
+check('approvals leave a step the student already passed alone', () => {
+  const s = stuckOn(plainStep);
+  Object.assign(s.steps[keyFor(plainStep)], { status: 'done', verdict: { pass: true, ts: 1 }, xpAwarded: true });
+  approvals.applyApproval(s, plainStep, approval(plainStep));
+  assert.strictEqual(s.steps[keyFor(plainStep)].verdict.by, undefined);
+  assert.strictEqual(s.steps[keyFor(plainStep)].thread.length, 0);
+  assert.ok(s.approvalsSeen.a1, 'still seen, so it is never retried');
+});
+
+check('approvals survive a save from a tab that never saw them', () => {
+  const stale = stuckOn(plainStep);
+  assert.strictEqual(approvals.mergeApprovals(stale, [approval(plainStep)], findStep), 1);
+  assert.strictEqual(stale.steps[keyFor(plainStep)].status, 'done');
+  assert.strictEqual(stale.xp, 100 + (plainStep.step.xp || 30));
+});
+
+check('approvals already seen are not re-applied, so a redo stays a redo', () => {
+  const redone = stuckOn(plainStep, { approvalsSeen: { a1: 1700000000000 } });
+  assert.strictEqual(approvals.mergeApprovals(redone, [approval(plainStep)], findStep), 0);
+  assert.strictEqual(redone.steps[keyFor(plainStep)].status, 'pending');
+});
+
+check('approvals for a step the curriculum no longer has are skipped', () => {
+  const s = stuckOn(plainStep);
+  assert.strictEqual(approvals.mergeApprovals(s, [{ id: 'gone', key: 'no-such/step', ts: 1 }], findStep), 0);
+});
+
+check('records say which passes were the instructor\'s', () => {
+  const s = approvals.applyApproval(stuckOn(plainStep), plainStep, approval(plainStep));
+  const r = records.toRecord({ oid: '00000000-0000-0000-0000-000000000001', state: s, profile: {}, settings: {} });
+  const st = r.steps[keyFor(plainStep)];
+  assert.strictEqual(st.approvedBy, 'instructor');
+  assert.ok(st.rounds.every(x => !x.passed), 'the approval is not an AI pass');
+  assert.strictEqual(records.digest(r).steps[keyFor(plainStep)].approvedBy, 'instructor');
+});
+
 /* ------------------------------------------------------------------ */
 
 console.log(`\n${pass} passed, ${fail} failed${skip ? `, ${skip} skipped` : ''}\n`);

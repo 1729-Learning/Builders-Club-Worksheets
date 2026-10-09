@@ -109,6 +109,15 @@ Optionally set `ALLOWED_EMAIL_DOMAINS=yourschool.edu` to limit who can get in. W
 
 The number on the right is how many steps from the class median someone is. It is a position, not a grade, and it makes no claim about how hard anyone worked.
 
+### When a student is stuck on the AI
+
+If the AI keeps sending a student back on a step, you can pass it for them. Open the student (**Read their worksheets**), go to the step, and click **✓ Approve as instructor**. You can add a short note. The note shows up in the student's thread under "Your instructor".
+
+- It counts the same as an AI pass: the step is done, it pays its XP, and if it's the section's artifact step the artifact is minted.
+- The student's page picks it up within about 30 seconds, even if they have it open.
+- The dashboard shows "approved by the instructor" on that step. Approved steps are left out of the attempts-to-pass numbers, since the AI never passed them.
+- The student can still **Redo** the step. The server keeps a snapshot from before the approval, so it can be rolled back from their Settings.
+
 ### Things it deliberately doesn't do
 
 **No streak.** Students see one; this doesn't. It counts *distinct days on which XP was earned*, not consecutive ones, and it never resets — so someone who worked in January and again in August shows a "2-day streak". Ranking a class by a number that doesn't mean what it says would be worse than showing nothing.
@@ -233,7 +242,7 @@ All worksheet content — worksheets, sections, steps, video segments, rubrics, 
 
 [`curriculum.js`](curriculum.js) projects that content into the flat, decided shape the dashboard wants — XP defaults applied, rubrics split into lines, every step given a stable `sectionId/stepId` key. It runs in both the browser and Node, and never mutates `WORKSHEETS`.
 
-The server ([`server.js`](server.js)) serves the static app and routes requests; the work is in [`lib/`](lib): `prompts.js` (the review persona and every prompt, as pure functions), `store.js` (per-student state, snapshots, profiles), `ai.js` (provider calls plus concurrency, single-flight and daily caps), `auth.js` (Microsoft sign-in and signed session cookies), and `records.js` (one student's stored state, shaped into the record the dashboard reads).
+The server ([`server.js`](server.js)) serves the static app and routes requests; the work is in [`lib/`](lib): `prompts.js` (the review persona and every prompt, as pure functions), `store.js` (per-student state, snapshots, profiles), `ai.js` (provider calls plus concurrency, single-flight and daily caps), `auth.js` (Microsoft sign-in and signed session cookies), `approvals.js` (an instructor passing a step the AI won't), and `records.js` (one student's stored state, shaped into the record the dashboard reads).
 
 The front-end is a hash-routed single-page app — no framework, no build step, classic `<script>` tags whose order in [`index.html`](public/index.html) is the dependency graph. [`public/app.js`](public/app.js) is the student's worksheets; the `dash-*.js` files are the instructor's dashboard, kept separate so the two halves don't grow into each other: `dash-aggregate.js` (every number, as pure functions), `dash-ui.js` (HTML-string helpers), `dash-store.js` (what's loaded and how), `dash-app.js` (its router), and one file per screen.
 
