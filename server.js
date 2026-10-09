@@ -11,12 +11,14 @@
     store.js    per-student state, snapshots, settings, profiles, usage
     ai.js       provider calls plus concurrency, single-flight and daily caps
     auth.js     Microsoft sign-in, signed session cookies, CSRF
+    approvals.js  an instructor passing a step the AI won't
 
   Run it locally with: ALLOW_DEV_LOGIN=1 npm start
 */
 'use strict';
 
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -34,6 +36,7 @@ const store = require('./lib/store.js');
 const ai = require('./lib/ai.js');
 const auth = require('./lib/auth.js');
 const records = require('./lib/records.js');
+const approvals = require('./lib/approvals.js');
 const curriculum = require('./curriculum.js');
 
 const PORT = Number(process.env.PORT || 4321);
@@ -238,6 +241,39 @@ async function handleApi(req, res, pathname, url) {
     return sendJSON(res, 200, store.readState(oid));
   }
 
+  /* A student stuck on a step the AI keeps sending back: the instructor passes
+     it for them. Applied here at once, and re-applied to whatever the student's
+     open tab saves next — see lib/approvals.js for why both are needed. */
+  const approve = pathname.match(/^\/api\/instructor\/students\/([^/]+)\/approve$/);
+  if (approve && method === 'POST') {
+    const who = auth.requireInstructor(req, res, sendJSON);
+    if (!who) return;
+    const oid = decodeURIComponent(approve[1]);
+    if (!store.isOid(oid)) return sendJSON(res, 400, { error: 'bad student id' });
+    if (!store.studentExists(oid)) return sendJSON(res, 404, { error: 'unknown student' });
+    const { sectionId, stepId, note = '' } = await readBody(req);
+    const found = prompts.findStep(sectionId, stepId);
+    if (!found) return sendJSON(res, 404, { error: 'unknown step' });
+    if (!approvals.isApprovable(found.step)) return sendJSON(res, 400, { error: 'That step isn\u2019t reviewed by the AI, so there is nothing to approve.' });
+    const key = sectionId + '/' + stepId;
+    const state = store.readState(oid);
+    const st = (state.steps || {})[key];
+    if (st && st.status === 'done') return sendJSON(res, 409, { error: 'That step is already complete.' });
+    if (!st || !String(st.answer || '').trim()) return sendJSON(res, 400, { error: 'Nothing to approve yet \u2014 this student hasn\u2019t written an answer to that step.' });
+    const approval = {
+      id: crypto.randomBytes(8).toString('hex'),
+      key,
+      by: who.email || who.name || 'instructor',
+      ts: Date.now(),
+      note: String(note).slice(0, 1000),
+    };
+    store.addApproval(oid, approval);
+    approvals.applyApproval(state, found, approval);
+    store.writeState(oid, state); // snapshots first, so the student can still roll it back
+    console.log(`[approve] ${approval.by} approved ${key} for ${oid}`);
+    return sendJSON(res, 200, { state });
+  }
+
   /* ---- everything below is the signed-in student's own work ---- */
 
   const user = auth.requireSession(req, res, sendJSON);
@@ -255,10 +291,19 @@ async function handleApi(req, res, pathname, url) {
     if (!body || typeof body !== 'object' || typeof body.steps !== 'object' || body.steps === null) {
       return sendJSON(res, 400, { error: 'not a worksheet state' });
     }
+    // A tab that hasn't seen an instructor's approval would undo it; put it
+    // back, and tell the tab to reload so the student sees it.
+    const merged = approvals.mergeApprovals(body, store.readApprovals(oid), prompts.findStep);
     body.meta = Object.assign({}, body.meta, { version: 1, updatedAt: Date.now() });
     store.writeState(oid, body);
     store.touchLastSeen(oid);
-    return sendJSON(res, 200, { ok: true });
+    return sendJSON(res, 200, merged ? { ok: true, reload: true } : { ok: true });
+  }
+
+  // Polled by the student's tab, so an approval shows up while they sit and
+  // wait for it rather than on their next keystroke.
+  if (pathname === '/api/approvals' && method === 'GET') {
+    return sendJSON(res, 200, { ids: store.readApprovals(oid).map(a => a.id) });
   }
 
   if (pathname === '/api/settings' && method === 'GET') {

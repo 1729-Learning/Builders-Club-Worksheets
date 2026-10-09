@@ -175,7 +175,9 @@ var aggregate = (function () {
         if (st.status === 'done') {
           completed++;
           lengths.push(st.answerWords);
-          if (isAiReviewed(step) && st.accepted && st.attempts > 0) attemptsOfPassers.push(st.attempts);
+          // An instructor's approval is the AI not passing it, so it says nothing
+          // about how many tries the AI's bar takes.
+          if (isAiReviewed(step) && st.accepted && !st.approvedBy && st.attempts > 0) attemptsOfPassers.push(st.attempts);
         } else if (st.status === 'mastered') {
           mastered++;
         } else if (st.status === 'inProgress') {

@@ -492,6 +492,9 @@ body.readonly [data-copyprompt],body.readonly [data-copypractice],body.readonly 
 body.readonly [data-boarddel],body.readonly [data-listadd],body.readonly [data-listdel],
 body.readonly .li-add-row,body.readonly .redo-btn{display:none}
 body.readonly textarea.answer,body.readonly .li-input,body.readonly .bd-card{background:var(--pad-2);cursor:default}
+/* The one thing an instructor can do there: pass a step the AI won't. */
+.btn.approve-btn{background:var(--green-tint);color:#0e7a4f}
+.btn.approve-btn:hover{background:var(--green);color:#fff}
 
 /* ----- instructor roster ----- */
 .table-wrap{overflow-x:auto;margin-top:14px}

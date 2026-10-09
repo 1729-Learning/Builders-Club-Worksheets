@@ -121,7 +121,8 @@ var ui = (function () {
     const stuck = step.status === 'inProgress' && step.attempts >= 3;
     const cls = step.status === 'done' ? 'is-done' : step.status === 'mastered' ? 'is-mastered' : stuck ? 'is-stuck' : 'is-open';
     const meta = step.status === 'done'
-      ? (step.accepted ? `passed on attempt ${step.attempts}` : 'done') + (step.completedOn ? ` · ${day(step.completedOn)}` : '')
+      ? (step.approvedBy === 'instructor' ? `approved by the instructor after ${step.attempts} attempt${step.attempts === 1 ? '' : 's'}`
+        : step.accepted ? `passed on attempt ${step.attempts}` : 'done') + (step.completedOn ? ` · ${day(step.completedOn)}` : '')
       : step.status === 'mastered' ? 'skipped by Builders AI · no XP'
       : `${step.attempts} attempt${step.attempts === 1 ? '' : 's'} so far · not accepted yet`;
 

@@ -52,6 +52,7 @@ function el(html) { const d = document.createElement('div'); d.innerHTML = html.
 function $(sel, root) { return (root || document).querySelector(sel); }
 
 const AGENT_AVATAR = '<img src="./favicon.svg" alt="AI">';
+const INSTRUCTOR_AVATAR = '<span role="img" aria-label="Instructor">🧑‍🏫</span>';
 
 /* ------------------------------------------------------------- worksheets */
 /* WORKSHEETS itself comes from content.js — classic scripts share the global
@@ -114,15 +115,22 @@ function hideAuthBanner() {
 
 let state = null;
 let saveTimer = null;
+let savesInFlight = 0;
 let appSettings = { freeRoam: false }; // refreshed from /api/settings at boot and on settings changes
 
 function saveState(immediate) {
   if (viewingAs) return Promise.resolve(); // an instructor reading a student's work never writes to it
   clearTimeout(saveTimer);
   saveTimer = null;
-  const doSave = () => api('/api/state', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
-  }).catch(() => {});
+  const doSave = () => {
+    savesInFlight++;
+    return api('/api/state', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
+    }).then(r => r.json())
+      // The server put back an instructor's approval this tab hadn't seen.
+      .then(out => { savesInFlight--; if (out && out.reload) reloadOwnState(); })
+      .catch(() => { savesInFlight--; });
+  };
   if (immediate) return doSave();
   saveTimer = setTimeout(doSave, 500);
 }
@@ -135,6 +143,94 @@ function flushPendingSave() {
   clearTimeout(saveTimer);
   saveTimer = null;
   return saveState(true);
+}
+
+/* ---------------------------------------------------------------- instructor approvals
+
+   An instructor can pass a step for a student the AI keeps sending back. The
+   server applies it, and re-applies it to any save from a tab that hasn't seen
+   it (lib/approvals.js). This side's job is to notice and show it: after such a
+   save, and from a slow poll so a student waiting with their hands off the
+   keyboard sees it too. */
+
+// Take the server's copy, which is ours plus the approval. Only when nothing of
+// ours is still on its way there; otherwise the next save brings this round again.
+let reloadingState = false;
+async function reloadOwnState() {
+  const settled = () => !viewingAs && !saveTimer && !savesInFlight && !inflightWork;
+  if (reloadingState || !settled()) return;
+  reloadingState = true;
+  try {
+    const before = state;
+    const fresh = normalizeState(await (await api('/api/state')).json());
+    if (state !== before || !settled()) return;
+    const seen = before.approvalsSeen || {};
+    const newlyApproved = Object.keys(fresh.approvalsSeen || {}).filter(id => !seen[id]);
+    state = fresh;
+    // Stay on the approved step, so the student sees why it turned green
+    // rather than being moved on to the next one with no explanation.
+    for (const [k, st] of Object.entries(state.steps)) {
+      const msg = st.thread && st.thread.find(m => m.approvalId && newlyApproved.includes(m.approvalId));
+      if (msg) showStep(k);
+    }
+    updateHeader();
+    route();
+  } catch { /* the poll comes round again */ } finally {
+    reloadingState = false;
+  }
+}
+
+async function checkApprovals() {
+  if (!state || viewingAs || document.hidden) return;
+  try {
+    const { ids } = await (await api('/api/approvals')).json();
+    const seen = state.approvalsSeen || {};
+    if (!(ids || []).some(id => !seen[id])) return;
+    await flushPendingSave();
+    reloadOwnState();
+  } catch { /* offline, or signed out — the banner covers that */ }
+}
+
+const APPROVAL_POLL_MS = 30_000;
+function startApprovalPoll() {
+  setInterval(checkApprovals, APPROVAL_POLL_MS);
+  document.addEventListener('visibilitychange', checkApprovals);
+}
+
+function showStep(k) {
+  const { section, step } = findByKey(k);
+  if (section && step) focusView.set(section.id, section.steps.indexOf(step));
+}
+
+function approveBtnHTML(step, k) {
+  if (!viewingAs || !step.rubric || isDone(k)) return '';
+  return `<button class="btn approve-btn" data-approve="${k}" title="Pass this step for the student, as if the AI had accepted it">✓ Approve as instructor</button>`;
+}
+
+async function approveStep(k, btn) {
+  const { section, step } = findByKey(k);
+  const student = viewingAs;
+  if (!student || !section || !step) return;
+  const who = student.name || student.email || 'this student';
+  const note = prompt(`Approve “${step.title}” for ${who}?\n\nIt counts as passed, with the step’s full XP. They can still redo it.\n\nOptional note to the student:`, '');
+  if (note === null) return;
+  btn.disabled = true;
+  try {
+    const res = await api(`/api/instructor/students/${encodeURIComponent(student.oid)}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sectionId: section.id, stepId: step.id, note }),
+    });
+    const out = await res.json();
+    if (!res.ok) { alert(out.error || 'That approval didn’t go through.'); btn.disabled = false; return; }
+    dashApp.invalidate();
+    if (viewingAs !== student) return; // moved on to someone else while it saved
+    state = normalizeState(out.state);
+    showStep(k);
+    route();
+  } catch (e) {
+    if (e.name !== 'AuthError') alert('That approval didn’t go through — check your connection and try again.');
+    btn.disabled = false;
+  }
 }
 
 function keyOf(section, step) { return section.id + '/' + step.id; }
@@ -660,7 +756,7 @@ function parseBuilderFile(text) {
     if (/^\*\*Task:\*\*/.test(line)) continue;
     if (/^_Watched segment /.test(line)) { watched = true; continue; }
     if ((m = line.match(/^_Mastered — skipped\. (.*)_$/))) { mastered = m[1]; continue; }
-    if ((m = line.match(/^_Accepted by Builders AI after (\d+) attempt/))) { attempts = +m[1]; continue; }
+    if ((m = line.match(/^_(?:Accepted by Builders AI|Approved by the instructor) after (\d+) attempt/))) { attempts = +m[1]; continue; }
     buf.push(line);
   }
   flush();
@@ -676,6 +772,9 @@ async function importBuilderFile(input) {
   const n = Object.values(data.steps).filter(st => st.status === 'done').length;
   if (!n && !Object.keys(data.mastery).length) { alert('No completed steps found in that Builder file.'); return; }
   if (!confirm(`Restore from this Builder file? It holds ${n} completed step${n === 1 ? '' : 's'} and ${data.xp} XP. Everything currently in your account will be replaced by it.`)) return;
+  // Approvals already picked up stay picked up, or the server would re-apply
+  // them on top of the file.
+  data.approvalsSeen = state.approvalsSeen;
   state = data;
   await saveState(true);
   location.hash = '#/';
@@ -833,7 +932,7 @@ function latestHTML(st, k) {
   const last = [...st.thread].reverse().find(m => m.role === 'agent');
   if (!last) return '';
   return `<div class="review-latest" id="latest-${cssId(k)}">
-    <div class="rl-head">${AGENT_AVATAR} Builders AI · latest feedback</div>
+    <div class="rl-head">${last.by === 'instructor' ? INSTRUCTOR_AVATAR + ' Your instructor' : AGENT_AVATAR + ' Builders AI'} · latest feedback</div>
     <div class="rl-body">${bubbleHTML(last)}</div>
   </div>`;
 }
@@ -859,8 +958,9 @@ function bubbleHTML(m) {
   }
   // Rubric "reasons" stay in state (and exports) but aren't rendered — the
   // feedback prose already says it, and a second red list just adds noise.
-  return `<div class="msg agent ${m.kind || ''}"><div class="msg-avatar">${AGENT_AVATAR}</div>
-    <div class="msg-body"><div class="msg-tag">Builders AI</div><div class="msg-text">${mdLite(m.text)}</div></div></div>`;
+  const byInstructor = m.by === 'instructor';
+  return `<div class="msg agent ${m.kind || ''}"><div class="msg-avatar">${byInstructor ? INSTRUCTOR_AVATAR : AGENT_AVATAR}</div>
+    <div class="msg-body"><div class="msg-tag">${byInstructor ? 'Your instructor' : 'Builders AI'}</div><div class="msg-text">${mdLite(m.text)}</div></div></div>`;
 }
 
 /* ---- interactive list answer ("add a box" for n-of-things steps) ---- */
@@ -1102,6 +1202,7 @@ function boardHTML(section, step, status) {
   const actions = reviewed
     ? `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
        <button class="btn" data-review="${k}">${st.attempts > 0 ? 'Resubmit ▸' : 'Submit & Review'}</button>
+       ${approveBtnHTML(step, k)}
        ${reqNote}`
     : `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
        <button class="btn" data-saveboard="${k}">${done ? 'Save new cards' : 'Save scoreboard'}</button>
@@ -1195,6 +1296,7 @@ function stepBodyHTML(section, step, status) {
         ${isJournal
           ? `<button class="btn" data-savejournal="${k}">Save entry</button>`
           : `<button class="btn" data-review="${k}">${st.attempts > 0 ? 'Resubmit ▸' : 'Submit & Review'}</button>`}
+        ${approveBtnHTML(step, k)}
         ${reqNote}
       </div>
     </div>
@@ -1904,7 +2006,11 @@ function exportBuilderFile(src, filename) {
         continue;
       }
       lines.push(`**Task:** ${step.prompt}`, '', st.answer || '', '');
-      if (st.verdict && st.verdict.pass) lines.push(`_Accepted by Builders AI after ${st.attempts} attempt${st.attempts === 1 ? '' : 's'}._`, '');
+      if (st.verdict && st.verdict.pass) {
+        lines.push(st.verdict.by === 'instructor'
+          ? `_Approved by the instructor after ${st.attempts} attempt${st.attempts === 1 ? '' : 's'}._`
+          : `_Accepted by Builders AI after ${st.attempts} attempt${st.attempts === 1 ? '' : 's'}._`, '');
+      }
     }
     lines.push('');
     }
@@ -1956,6 +2062,9 @@ function wire() {
   document.addEventListener('click', e => {
     // Reading a student's work: swallow anything that would write to it.
     if (viewingAs && e.target.closest(MUTATING_SEL)) { e.preventDefault(); return; }
+
+    const appr = e.target.closest('[data-approve]');
+    if (appr) { approveStep(appr.dataset.approve, appr); return; }
 
     const student = e.target.closest('[data-student]');
     const dl = e.target.closest('[data-dl]');
@@ -2376,6 +2485,7 @@ async function boot() {
   dashApp.boot({ api });
   showWho();
   route();
+  startApprovalPoll();
   // The web fonts land after the first render and change how the text wraps,
   // so measure again once they're in.
   if (document.fonts) document.fonts.ready.then(() => { sizeListBoxes(); sizeRecapBoxes(); });
