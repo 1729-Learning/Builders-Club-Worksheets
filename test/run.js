@@ -588,6 +588,31 @@ check('records say which passes were the instructor\'s', () => {
   assert.strictEqual(records.digest(r).steps[keyFor(plainStep)].approvedBy, 'instructor');
 });
 
+/* ------------------------------------------------------------------ prompts */
+
+group('prompts');
+
+const prompts = require('../lib/prompts.js');
+
+// A student who finished Section 1 on one idea and switched to another in
+// Section 2. The market map must be judged against the new one.
+check('prompts for the market map do not pin the Section 1 problem statement', () => {
+  const found = findStep('user-needs', 'market-map');
+  const state = {
+    steps: {
+      'problem-statement/final-statement': { status: 'done', answer: 'OLD IDEA: dog walkers lose keys' },
+      'user-needs/research-recall': { status: 'done', answer: 'NEW IDEA: captains cannot find scrim times' },
+    },
+    artifacts: { 'problem-statement': 'OLD IDEA: dog walkers lose keys' },
+    mastery: {},
+  };
+  const prompt = prompts.buildReviewPrompt({ ...found, answer: 'Group chat — well: …', attempt: 1, state });
+  const pinned = prompt.split('## Work this step builds on')[1].split('## Student\'s prior accepted work')[0];
+  assert.ok(pinned.includes('NEW IDEA'), 'the Section 2 research is pinned');
+  assert.ok(!pinned.includes('OLD IDEA'), 'the Section 1 statement is not pinned');
+  assert.ok(prompt.includes('never fail them for having changed it'));
+});
+
 /* ------------------------------------------------------------------ */
 
 console.log(`\n${pass} passed, ${fail} failed${skip ? `, ${skip} skipped` : ''}\n`);

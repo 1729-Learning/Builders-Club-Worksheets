@@ -364,8 +364,8 @@ const MVP_WORKSHEET = {
           id: 'market-map',
           type: 'exercise',
           title: 'Map what already exists',
-          buildsOn: ['problem-statement/final-statement'],
-          prompt: 'Your problem statement is pinned below. List at least THREE things those users use today to deal with it — apps, spreadsheets, group chats, sticky notes, memory, or plain putting-up-with-it — one per box. For each: what it does WELL, and where it FALLS SHORT for your user. Make your LAST box the gap: "THE GAP: [the thing none of them do]".',
+          buildsOn: ['user-needs/research-recall'],
+          prompt: 'What people told you is pinned below. List at least THREE things the people you\'re researching use today to deal with the problem — apps, spreadsheets, group chats, sticky notes, memory, or plain putting-up-with-it — one per box. For each: what it does WELL, and where it FALLS SHORT for your user. Make your LAST box the gap: "THE GAP: [the thing none of them do]".',
           listAnswer: { min: 4, max: 7, itemLabel: 'Option', placeholder: '[what they use today] — well: …; falls short: …' },
           xp: 30,
           lessonPanel: {
@@ -375,7 +375,7 @@ const MVP_WORKSHEET = {
           },
           rubric: `- At least THREE current options/workarounds; informal ones (memory, group chats, doing nothing) count
 - Each option has BOTH something it does well AND a specific way it falls short for this user
-- The shortfalls connect to the student's stated problem or research, not generic complaints
+- The shortfalls connect to the problem the student is working on now or to their research, not generic complaints. Their idea may have changed since their Section 1 problem statement; judge against the current one
 - Ends with a one-line gap naming what none of the current options do`,
         },
         {
@@ -407,7 +407,7 @@ const MVP_WORKSHEET = {
             bad: 'Users need an AI-powered dashboard. <em>(that\'s your solution wearing a need costume)</em>',
           },
           rubric: `- THREE distinct need statements, each naming who needs it, what they need to be able to do, and why
-- The user matches the person in their problem statement (or a deliberate, stated narrowing)
+- The user is the person their Section 2 research is about. It may differ from their Section 1 problem statement; a changed idea is fine
 - What they need is a capability/outcome, NOT a feature, product, or technology
 - Each reason is grounded in their reported research or observations, not invented
 - The three needs are genuinely different, not one need rephrased`,
