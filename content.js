@@ -11,7 +11,10 @@
     exercise  — AI review loop against `rubric`; optional `reviewerNote` adds special reviewer
                 instructions (role-plays, red-teams) injected into the review prompt
     synthesis — auto-drafts on first open, using ONLY the student's words from `synthesizesFrom` steps;
-                isArtifact:true → the accepted answer becomes the hub card's final artifact
+                isArtifact:true → the accepted answer becomes the hub card's final artifact.
+                A source id is a step in the same section, or a full 'sectionId/stepId' key for
+                another section's step. The auto-draft waits until every source that is a
+                section's artifact step has been earned.
 
   Optional worksheet fields:
     extra:     true — bonus worksheet. Renders on the EXTRAS shelf at the bottom of the home
@@ -1266,7 +1269,100 @@ const SHIP_SECTION = {
       ],
 };
 
-MVP_WORKSHEET.sections.push(SHIP_SECTION);
+/* ==================================================================
+   SECTION 6 · YOUR PITCH
+   Comes after the MVP plan in the semester, but sits after Ship It on the
+   page so Ship It keeps its Section 5 number.
+   ================================================================== */
+const PITCH_SECTION = {
+  id: 'pitch',
+  num: 6,
+  title: 'Your Pitch',
+  kicker: 'Section 06 · Present It',
+  alwaysUnlocked: true, // open early so the story step can start; the outline drafts once Section 4 is done
+  tagline: 'Five slides, two to three minutes: the problem, why it hurts today, what you saw, what you\'ll build, and how.',
+  xp: 100,
+  artifactLabel: 'YOUR PITCH OUTLINE',
+  steps: [
+    {
+      id: 'video-pitch-story',
+      type: 'video',
+      title: 'Your user is the hero, not you',
+      prompt: 'Watch: Nancy Duarte found the same structure under "I Have a Dream" and the iPhone launch. Your pitch borrows it — show the world as it is for your user, then the world as it could be.',
+      video: { youtubeId: '1nYFpuc2Umk', start: 301, end: 524 },
+      xp: 20,
+      videoRecap: [
+        'The basic story shape: a likable protagonist wants something, hits an obstacle, and is changed by the end. In a pitch, the audience and your user are the protagonist, not you — "You\'re not Luke Skywalker, you\'re Yoda."',
+        'Open on what is: the situation your audience recognizes. Then contrast it with what could be, and make that gap as wide as the facts allow.',
+        'The middle moves back and forth between what is and what could be, which surfaces the doubts your audience already has instead of ignoring them.',
+        'Close on a call to action, followed by a specific picture of the world once your idea exists.',
+      ],
+    },
+    {
+      id: 'pitch-scene',
+      type: 'exercise',
+      title: 'Your experience with it',
+      buildsOn: ['user-needs/research-recall', 'problem-statement/journal-problems'],
+      prompt: 'This is the slide only you can give. In 3–5 sentences, put the audience in ONE moment where one specific person hits your problem — you, or someone you interviewed. Where are they, what time is it, what are they doing, what goes wrong? No statistics. Then add one line: a real quote from your research (pinned below) that backs the scene up.',
+      placeholder: 'SCENE: It\'s 7:40am and Marcus is …\nQUOTE: "…" — [who said it]',
+      xp: 30,
+      reviewerNote: 'Respond as an audience member at a demo day rather than a grader. Say honestly whether the scene put you in a room with a specific person at a specific moment, or whether it opened with a statistic or a general statement. If the student made themselves the hero of the story instead of the person with the problem, point that out — unless the student IS the person with the problem, which is fine. Check the quote looks like something a real person said, not a conclusion. Judge against the problem the student is working on now, even if it differs from their Section 1 problem statement.',
+      lessonPanel: {
+        point: 'Statistics are what we reach for when we don\'t have a scene. <b>"73% of students report scheduling stress"</b> is easy to forget. <b>"It\'s 7:40am and Marcus is texting three group chats to find out whether he\'s on register"</b> sticks — and it says the same thing.',
+        good: 'SCENE: Friday, 9pm, the night before our scrim. I\'m captain, I\'ve posted the poll twice, and three people have reacted with a thumbs-up but nobody has said whether they can actually play. QUOTE: "I just text all five of them and hope somebody answers" — another team\'s captain.',
+        bad: 'SCENE: Scheduling is a big problem for a lot of teams and it causes stress. <em>(no person, no moment — there\'s nothing for the audience to picture)</em>',
+      },
+      rubric: `- A specific scene: a named or clearly drawn person, a specific moment, something concrete going wrong — NOT a statistic or a general statement
+- The person with the problem is the focus (the student is fine if they are that person)
+- The scene shows the problem the student is working on now
+- Includes one quote that reads like something a real person said, attributed to who said it`,
+    },
+    {
+      id: 'video-pitch-slides',
+      type: 'video',
+      title: 'Three rules for readable slides',
+      prompt: 'Watch before you build the deck: three rules that matter most in slide design — two of them go against what every slide template does by default.',
+      video: { youtubeId: 'Iwpi1Lm6dFo', start: 365, end: 634 },
+      xp: 20,
+      videoRecap: [
+        'One message per slide. Give an audience two and they pick one and lose the other.',
+        'Don\'t put full sentences on a slide and read them aloud — audiences remember almost nothing. Short text plus an image on screen; the sentences go in your notes and out of your mouth.',
+        'Attention goes to movement, signal colours like red, orange and yellow, high contrast, and big things. Use them on purpose.',
+        'The rule that follows: the most important thing on a slide should also be the biggest thing on the slide.',
+      ],
+    },
+    {
+      id: 'pitch-outline',
+      type: 'synthesis',
+      isArtifact: true,
+      title: 'Your pitch outline',
+      resources: [
+        { title: 'People Skills — Telling It As A Story', url: '#/w/people-skills/s/story-telling', note: 'More practice turning your problem into a story the audience can picture.' },
+        { title: 'People Skills — Slide Design', url: '#/w/people-skills/s/slide-design', note: 'Set your font, colours and word limit once, so every slide looks like it belongs.' },
+      ],
+      prompt: 'Outline the five slides of your 2–3 minute pitch, in this order: 1 THE PROBLEM — who struggles with what, and what it costs them. 2 WHY IT\'S PAINFUL TODAY — what they use now and where it falls short. 3 MY EXPERIENCE — your scene and quote. 4 THE SOLUTION — your 2–3 core features and the need they meet. 5 THE PLAN — your first testable version, first testers, what success looks like, then your ASK: one sentence asking the audience for something specific. For each slide write ON SCREEN (8 words or fewer, or the image you\'ll show) and I SAY (1–2 sentences). If your idea changed after Section 1, use your Section 2 user and needs. A starting draft is assembled from your own work once your MVP plan is done — **rewrite it in your own words and fill in every gap.**',
+      placeholder: 'SLIDE 1 — THE PROBLEM\nON SCREEN: …\nI SAY: …',
+      xp: 35,
+      draftWordLimit: 220,
+      synthesizesFrom: ['user-needs/top-needs', 'user-needs/market-map', 'problem-statement/final-statement', 'pitch-scene', 'mvp-plan/final-plan'],
+      lessonPanel: {
+        point: 'Two to three minutes is about <b>300 spoken words</b> — a sentence or two per slide, and a story. The slide is not the script: put a few big words or one picture on screen, and say the rest out loud. End on an ask, because a pitch that asks for nothing gets nothing.',
+        good: 'SLIDE 2 — WHY IT\'S PAINFUL TODAY\nON SCREEN: "Polls die in a day"\nI SAY: Captains use group-chat polls and DMs today. They\'re free and everyone\'s in them — but by Saturday the answers are buried and nobody knows who\'s actually playing.',
+        bad: 'SLIDE 4 — THE SOLUTION\nON SCREEN: An AI-powered platform that revolutionizes team scheduling with smart features for every need. <em>(a sentence on screen, and no feature anyone could picture)</em>',
+      },
+      rubric: `- All five slides are present, in order: problem, why it's painful today, my experience, solution, plan
+- Slide 1 names a specific user, what they struggle with, and what it costs them
+- Slide 2 names what those users rely on today and where it falls short
+- Slide 3 is a specific scene plus a real quote, not a statistic
+- Slide 4 names 2–3 core features as things a user could see or do, tied to the user's #1 need
+- Slide 5 has a first testable version, real first testers, a success measure checkable within about 2 weeks, and ends with one specific ask
+- Each slide has short ON SCREEN text (about 8 words or an image) and 1–2 sentences of I SAY — it fits in 2–3 minutes
+- Consistent with the student's Section 2–4 work (top needs, market map, MVP plan); if the idea changed after Section 1, the newer work is the one to match`,
+    },
+  ],
+};
+
+MVP_WORKSHEET.sections.push(SHIP_SECTION, PITCH_SECTION);
 
 /* ==================================================================
    EXTRAS · the bonus shelf
