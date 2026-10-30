@@ -57,16 +57,16 @@ check('curriculum totals match the worksheets', () => {
 });
 
 check('curriculum core excludes the extras shelf', () => {
-  assert.strictEqual(CURRICULUM.coreStepCount, 63);
-  assert.strictEqual(CURRICULUM.coreSectionCount, 9);
+  assert.strictEqual(CURRICULUM.coreStepCount, 67);
+  assert.strictEqual(CURRICULUM.coreSectionCount, 10);
   assert.strictEqual(CURRICULUM.stepOrder.length - CURRICULUM.coreStepCount, 25, 'the extras');
 });
 
 check('curriculum step XP sums to the two-layer total', () => {
   let steps = 0, both = 0;
   for (const k of CORE) { steps += CURRICULUM.xpOfStep(k); both += CURRICULUM.xpForCompletedStep(k); }
-  assert.strictEqual(steps, 1460, 'steps alone');
-  assert.strictEqual(both - steps, 1020, 'the section bonuses');
+  assert.strictEqual(steps, 1565, 'steps alone');
+  assert.strictEqual(both - steps, 1120, 'the section bonuses');
   assert.strictEqual(both, CURRICULUM.maxXp);
 });
 
@@ -88,7 +88,7 @@ check('curriculum artifact steps pay their section bonus', () => {
 
 check('curriculum normalizes every rubric to a list of lines', () => {
   const withRubric = CURRICULUM.stepOrder.filter(k => CURRICULUM.stepByKey(k).rubric);
-  assert.strictEqual(withRubric.length, 29);
+  assert.strictEqual(withRubric.length, 31);
   for (const k of withRubric) {
     const r = CURRICULUM.stepByKey(k).rubric;
     assert.ok(Array.isArray(r) && r.length, k);
@@ -293,7 +293,7 @@ check('aggregate counts a student against core only', () => {
   const extraKey = CURRICULUM.stepOrder.find(k => CURRICULUM.isExtra(CURRICULUM.stepByKey(k).worksheetId));
   steps[extraKey] = done(extraKey);
   const p = aggregate.computeStudentProgress(rec('Ada', steps), CURRICULUM);
-  assert.strictEqual(p.stepsTotal, 63);
+  assert.strictEqual(p.stepsTotal, 67);
   assert.strictEqual(p.stepsDone, 10);
   assert.strictEqual(p.extraStepsDone, 1);
   let expected = 0;
@@ -611,6 +611,33 @@ check('prompts for the market map do not pin the Section 1 problem statement', (
   assert.ok(pinned.includes('NEW IDEA'), 'the Section 2 research is pinned');
   assert.ok(!pinned.includes('OLD IDEA'), 'the Section 1 statement is not pinned');
   assert.ok(prompt.includes('never fail them for having changed it'));
+});
+
+check('prompts: every synthesizesFrom source is a real step', () => {
+  for (const w of WORKSHEETS) for (const s of w.sections) for (const st of s.steps) {
+    for (const id of st.synthesizesFrom || []) {
+      const [sid, stid] = id.includes('/') ? id.split('/') : [s.id, id];
+      assert.ok(findStep(sid, stid), `${s.id}/${st.id} draws on ${id}, which doesn't exist`);
+    }
+  }
+});
+
+// The pitch outline drafts from three other sections, and a Section 1
+// statement restored from a Builder file may exist only as the artifact.
+check('prompts draft the pitch outline from other sections\' work', () => {
+  const found = findStep('pitch', 'pitch-outline');
+  const state = {
+    steps: {
+      'user-needs/top-needs': { status: 'done', answer: 'TOP NEEDS: captains need to know who is free' },
+      'mvp-plan/final-plan': { status: 'done', answer: 'MVP PLAN: availability grid, 4 captains test it' },
+      'pitch/pitch-scene': { status: 'done', answer: 'SCENE: Friday 9pm, the poll is dead' },
+    },
+    artifacts: { 'problem-statement': 'STATEMENT FROM ARTIFACT: captains struggle to book scrims' },
+    mastery: {},
+  };
+  const prompt = prompts.buildDraftPrompt({ ...found, state });
+  for (const text of ['TOP NEEDS', 'MVP PLAN', 'SCENE', 'STATEMENT FROM ARTIFACT']) assert.ok(prompt.includes(text), text);
+  assert.ok(prompt.includes('### Your MVP plan'), 'sources are titled by their own step');
 });
 
 /* ------------------------------------------------------------------ */

@@ -868,10 +868,16 @@ function settingsCardHTML(s) {
 function pinnedSourceKeys(section, step) {
   const keys = [...(step.buildsOn || [])];
   for (const id of (step.synthesizesFrom || [])) {
-    const full = section.id + '/' + id;
+    const full = sourceKey(section, id);
     if (!keys.includes(full)) keys.push(full);
   }
   return keys;
+}
+
+// A synthesizesFrom id is a step in the same section, or a full
+// 'sectionId/stepId' key for a step in another one.
+function sourceKey(section, id) {
+  return id.includes('/') ? id : section.id + '/' + id;
 }
 
 function buildsOnHTML(section, step) {
@@ -1833,8 +1839,12 @@ function maybeAutoDraft(section) {
     if (st.status === 'done' || st.autoDrafted || autoDraftTried.has(k) || (st.answer || '').trim()) continue;
     const card = document.getElementById('step-' + cssId(k));
     if (!card || !card.classList.contains('is-active')) continue;
-    const hasSource = (step.synthesizesFrom || []).some(id => ((state.steps[section.id + '/' + id] || {}).answer || '').trim());
-    if (!hasSource) continue;
+    const keys = (step.synthesizesFrom || []).map(id => sourceKey(section, id));
+    const hasSource = keys.some(sk => ((state.steps[sk] || {}).answer || '').trim());
+    // Another section's artifact is a big piece of the draft — wait for it rather
+    // than draft around the hole, since the auto-draft only ever fires once.
+    const artifactsEarned = keys.every(sk => !(findByKey(sk).step || {}).isArtifact || isDone(sk));
+    if (!hasSource || !artifactsEarned) continue;
     autoDraftTried.add(k);
     draftFromWork(section, step);
     return; // one auto-draft at a time — the queue serializes AI calls anyway
