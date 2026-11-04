@@ -98,6 +98,7 @@ var viewBuilder = (function () {
     const section = CURRICULUM.sectionById(sec.sectionId);
     const videos = section.steps.filter(s => s.type === 'video');
     const videosDone = videos.filter(s => rec.steps[s.key]).length;
+    const videosSkipped = videos.filter(s => rec.steps[s.key] && rec.steps[s.key].video && rec.steps[s.key].video.skipped).length;
     const written = section.steps.filter(s => s.type !== 'video' && rec.steps[s.key]);
     const stuckHere = written.some(s => {
       const st = rec.steps[s.key];
@@ -107,7 +108,7 @@ var viewBuilder = (function () {
     const state = sec.state === 'done' ? 'green' : sec.inProgress ? 'blue' : '';
     const summary = [
       `${sec.done + sec.mastered} of ${sec.total} steps`,
-      videos.length ? `${videosDone}/${videos.length} videos` : '',
+      videos.length ? `${videosDone}/${videos.length} videos${videosSkipped ? ` (${videosSkipped} skipped)` : ''}` : '',
       written.length ? `${written.length} written answer${written.length === 1 ? '' : 's'}` : '',
     ].filter(Boolean).join(' · ');
 

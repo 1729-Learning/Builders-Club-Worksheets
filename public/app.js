@@ -620,7 +620,7 @@ function leaveViewingAs() {
 const MUTATING_SEL = '[data-review],[data-savejournal],[data-saveboard],[data-redo],[data-redostep],'
   + '[data-unmaster],[data-copyprompt],[data-copypractice],[data-boardadd],[data-boarddel],'
   + '[data-listadd],[data-listdel],[data-importmd],[data-showbackups],[data-restorebackup],'
-  + '[data-hardreset],[data-freeroam],[data-backend],[data-classimport]';
+  + '[data-hardreset],[data-freeroam],[data-backend],[data-classimport],[data-skipvideo]';
 
 /* ---------------------------------------------------------------- settings view */
 
@@ -707,7 +707,7 @@ function parseBuilderFile(text) {
   const hm = head && head.match(/·\s*(\d+)\s*XP\s*·\s*(\d+)-day/);
   if (hm) { s.xp = +hm[1]; s.streak = +hm[2]; }
 
-  let ws = null, section = null, step = null, buf = [], attempts = 0, mastered = null, watched = false;
+  let ws = null, section = null, step = null, buf = [], attempts = 0, mastered = null, watched = false, skipped = false;
 
   const flush = () => {
     if (section && step) {
@@ -717,7 +717,9 @@ function parseBuilderFile(text) {
       } else {
         while (buf.length && !buf[buf.length - 1].trim()) buf.pop();
         while (buf.length && !buf[0].trim()) buf.shift();
-        const st = { status: 'done', answer: watched ? '' : buf.join('\n'), attempts, thread: [], xpAwarded: true };
+        const st = skipped
+          ? { status: 'done', answer: '', attempts: 0, thread: [], videoSkipped: 'imported' } // skipping never earned XP
+          : { status: 'done', answer: watched ? '' : buf.join('\n'), attempts, thread: [], xpAwarded: true };
         if (attempts > 0) st.verdict = { pass: true, ts: Date.now() };
         if (step.board) { // rebuild the card columns from their serialized text
           const cols = boardCols(step);
@@ -734,7 +736,7 @@ function parseBuilderFile(text) {
         s.steps[k] = st;
       }
     }
-    step = null; buf = []; attempts = 0; mastered = null; watched = false;
+    step = null; buf = []; attempts = 0; mastered = null; watched = false; skipped = false;
   };
 
   for (let i = 1; i < lines.length; i++) {
@@ -755,6 +757,7 @@ function parseBuilderFile(text) {
     if (!step) continue;
     if (/^\*\*Task:\*\*/.test(line)) continue;
     if (/^_Watched segment /.test(line)) { watched = true; continue; }
+    if (/^_Skipped segment /.test(line)) { skipped = true; continue; }
     if ((m = line.match(/^_Mastered — skipped\. (.*)_$/))) { mastered = m[1]; continue; }
     if ((m = line.match(/^_(?:Accepted by Builders AI|Approved by the instructor) after (\d+) attempt/))) { attempts = +m[1]; continue; }
     buf.push(line);
@@ -1249,6 +1252,16 @@ function stepBodyHTML(section, step, status) {
   if (status === 'done') {
     const redoBtn = `<button class="redo-btn" data-redostep="${k}" title="Clear this step and do it again">↻ Redo</button>`;
     if (step.type === 'video') {
+      if (st.videoSkipped) {
+        const v = step.video;
+        return `${redoBtn}
+        <div class="done-stamp skipped"><span class="big">Segment skipped</span></div>
+        <p class="video-help-note">The video couldn’t play here, so you moved on without it. Watch
+          <a href="${esc(youtubeLink(v))}" target="_blank" rel="noopener">${fmtClock(v.start)}–${fmtClock(v.end)} on YouTube</a>
+          when you can, or hit Redo on a network that allows YouTube to earn the ${step.xp || 20} XP.</p>
+        ${step.videoRecap ? `<div class="recap"><h4>What that segment would have given you</h4><ul>${step.videoRecap.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}
+        ${resourcesHTML(step)}`;
+      }
       return `${redoBtn}
         <div class="done-stamp"><span class="big">Segment complete ✓</span>${xpPill(section, step.xp || 20)}</div>
         ${step.videoRecap ? `<div class="recap"><h4>What that segment gave you</h4><ul>${step.videoRecap.map(r => `<li>${esc(r)}</li>`).join('')}</ul></div>` : ''}
@@ -1273,6 +1286,7 @@ function stepBodyHTML(section, step, status) {
         <div class="video-progress"><div class="vp-fill" id="vpfill-${id}"></div></div>
         <span class="video-readout" id="vpread-${id}">segment ${fmtClock(v.start)}–${fmtClock(v.end)}</span>
       </div>
+      <div class="video-help" id="vhelp-${id}" hidden></div>
       ${resourcesHTML(step)}`;
   }
 
@@ -1476,6 +1490,29 @@ function mountVideo(section, step) {
   if (!host) return;
   const span = step.video.end - step.video.start;
 
+  /* The way past a video that won't play. School networks often block YouTube,
+     and a student shouldn't be stranded by that — but a skip button from the
+     first second would just get clicked. So it appears only when the gate
+     reports the video as blocked, or after SKIP_OFFER_MS if playback never
+     started. Once the video plays, the soft offer goes away again. */
+  let blockedReason = null;
+  let started = false;
+  const showHelp = () => {
+    const help = document.getElementById('vhelp-' + id);
+    if (!help) return;
+    help.innerHTML = blockedReason
+      ? `<p><strong>This video can’t load here.</strong> Your school’s network may be blocking YouTube.
+           You can skip it for now and watch it later; your instructor will see it was skipped.</p>
+         <button class="ask-btn" data-skipvideo="${k}" data-skipreason="${esc(blockedReason)}">Skip this video for now ▸</button>`
+      : `<p><strong>Video not playing?</strong> If it’s blocked on your network, you can skip it for now and
+           watch it later; your instructor will see it was skipped.</p>
+         <button class="ask-btn" data-skipvideo="${k}" data-skipreason="no-play">It won’t play — skip for now ▸</button>`;
+    help.hidden = false;
+  };
+  const hideHelp = () => { const help = document.getElementById('vhelp-' + id); if (help) help.hidden = true; };
+  const offerTimer = setTimeout(() => { if (!started) showHelp(); }, SKIP_OFFER_MS);
+  activeGates.push({ destroy() { clearTimeout(offerTimer); } });
+
   activeGates.push(VideoGate.create({
     el: host,
     youtubeId: step.video.youtubeId,
@@ -1493,7 +1530,31 @@ function mountVideo(section, step) {
       saveState();
     },
     onComplete() { completeVideo(section, step); },
+    onPlaying() { started = true; if (!blockedReason) hideHelp(); },
+    onBlocked(reason) { blockedReason = reason; showHelp(); },
   }));
+}
+
+const SKIP_OFFER_MS = 20000;
+
+function youtubeLink(v) {
+  return `https://www.youtube.com/watch?v=${encodeURIComponent(v.youtubeId)}&t=${Math.floor(v.start)}s`;
+}
+
+/* Done without watching. No XP — that is held back for actually watching it,
+   which a later Redo on a working network still earns (the latch never set). */
+function skipVideo(k, reason) {
+  if (viewingAs) return;
+  const { section, step } = findByKey(k);
+  if (!section || !step || step.type !== 'video') return;
+  const st = stepState(k);
+  if (st.status === 'done') return;
+  if (!confirm('Skip this video for now? You can come back and watch it later with Redo.')) return;
+  st.status = 'done';
+  st.doneAt = Date.now();
+  st.videoSkipped = String(reason || 'no-play').slice(0, 40);
+  saveState(true);
+  advanceFocus(section);
 }
 
 function completeVideo(section, step) {
@@ -1973,7 +2034,7 @@ function redoStep(k) {
   delete st.verdict;
   delete st.lastFeedback;
   delete st.doneAt;
-  if (step.type === 'video') { delete st.maxWatched; delete st.watchedSeconds; st.answer = ''; }
+  if (step.type === 'video') { delete st.maxWatched; delete st.watchedSeconds; delete st.videoSkipped; st.answer = ''; }
   // Redoing a synthesis step means "assemble me a fresh draft from my current work" —
   // clear the old draft and the once-only flag so the auto-draft fires again.
   if (step.type === 'synthesis') { delete st.autoDrafted; st.answer = ''; }
@@ -2012,7 +2073,7 @@ function exportBuilderFile(src, filename) {
       if (!st || st.status !== 'done') continue;
       lines.push(`### ${step.title}`, '');
       if (step.type === 'video') {
-        lines.push(`_Watched segment ${fmtClock(step.video.start)}–${fmtClock(step.video.end)} of youtube.com/watch?v=${step.video.youtubeId}_`, '');
+        lines.push(`_${st.videoSkipped ? 'Skipped' : 'Watched'} segment ${fmtClock(step.video.start)}–${fmtClock(step.video.end)} of youtube.com/watch?v=${step.video.youtubeId}_`, '');
         continue;
       }
       lines.push(`**Task:** ${step.prompt}`, '', st.answer || '', '');
@@ -2091,6 +2152,9 @@ function wire() {
       }
       return;
     }
+
+    const skipV = e.target.closest('[data-skipvideo]');
+    if (skipV) { skipVideo(skipV.dataset.skipvideo, skipV.dataset.skipreason); return; }
 
     const redoS = e.target.closest('[data-redostep]');
     if (redoS) { redoStep(redoS.dataset.redostep); return; }

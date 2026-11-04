@@ -145,6 +145,15 @@ check('records keep a finished video even though it has no answer', () => {
   assert.strictEqual(rec.steps[VIDEO].video.watchedSeconds, 130);
 });
 
+check('records flag a video that was skipped rather than watched', () => {
+  const rec = toRec({ [VIDEO]: { status: 'done', answer: '', attempts: 0, thread: [], videoSkipped: 'error:150' } });
+  assert.strictEqual(rec.steps[VIDEO].status, 'done');
+  assert.strictEqual(rec.steps[VIDEO].video.skipped, 'error:150');
+  assert.strictEqual(rec.steps[VIDEO].video.watchedSeconds, 0);
+  const watched = toRec({ [VIDEO]: { status: 'done', answer: '', attempts: 0, thread: [], maxWatched: 130 } });
+  assert.strictEqual(watched.steps[VIDEO].video.skipped, null);
+});
+
 check('records keep half-written work that was never submitted', () => {
   const rec = toRec({ [GRADED]: { status: 'pending', answer: 'half a thought', attempts: 0, thread: [] } });
   assert.strictEqual(rec.steps[GRADED].status, 'inProgress');

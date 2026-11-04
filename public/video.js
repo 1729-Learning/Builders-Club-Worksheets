@@ -4,31 +4,47 @@
   (anti-scrub + accumulated-watch-time check). It cannot stop someone muting the tab
   or watching the same video on youtube.com directly — by design, we shape the path,
   we don't prison-guard it.
+
+  Blocked networks: school filters often block YouTube outright, or let the page
+  load but not the video stream. The gate reports that through onBlocked(reason)
+  so the app can offer a way past the step instead of stranding the student:
+    'api'      — the iframe API script failed to load (youtube.com blocked)
+    'timeout'  — the player never became ready (embed replaced by a filter page)
+    'error:N'  — the player raised YouTube error N (unavailable / not embeddable)
+    'stalled'  — it started buffering and never got to playing
 */
 'use strict';
 
 const VideoGate = (() => {
   let apiPromise = null;
 
+  const READY_TIMEOUT_MS = 15000; // no onReady by then → the embed isn't coming
+  const STALL_TIMEOUT_MS = 15000; // buffering this long without playing → stream blocked
+
   function loadAPI() {
     if (apiPromise) return apiPromise;
-    apiPromise = new Promise(resolve => {
+    apiPromise = new Promise((resolve, reject) => {
       if (window.YT && window.YT.Player) return resolve(window.YT);
       const prev = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT); };
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
+      // A blocked script never fires onYouTubeIframeAPIReady. Forget the promise
+      // so a later mount (e.g. after the network changes) tries again.
+      tag.onerror = () => { apiPromise = null; tag.remove(); reject(new Error('api')); };
       document.head.appendChild(tag);
     });
     return apiPromise;
   }
 
   /*
-    create({ el, youtubeId, start, end, resumeAt, watchedSeconds, onProgress, onComplete })
+    create({ el, youtubeId, start, end, resumeAt, watchedSeconds, onProgress, onComplete, onPlaying, onBlocked })
     - el: container element (will host the iframe)
     - resumeAt: persisted maxWatched to resume from
     - onProgress({maxWatched, watchedSeconds, pct}) fires ~2x/sec while playing
     - onComplete() fires once when the segment is genuinely finished
+    - onPlaying() fires each time playback actually starts
+    - onBlocked(reason) fires at most once when the video can't be played here
     Returns { destroy() }.
   */
   function create(opts) {
@@ -41,6 +57,19 @@ const VideoGate = (() => {
     let lastTick = null;
     let completed = false;
     let destroyed = false;
+    let ready = false;
+    let blocked = false;
+    let readyTimer = null;
+    let stallTimer = null;
+
+    function clearStall() { if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; } }
+    function reportBlocked(reason) {
+      if (blocked || destroyed || completed) return;
+      blocked = true;
+      clearTimeout(readyTimer);
+      clearStall();
+      if (opts.onBlocked) opts.onBlocked(reason);
+    }
 
     function stopPoll() { if (poller) { clearInterval(poller); poller = null; } lastTick = null; }
 
@@ -81,6 +110,10 @@ const VideoGate = (() => {
       }
     }
 
+    // Covers both a script that hangs (no error, no load) and a player that is
+    // created but never reports ready because a filter replaced the embed.
+    readyTimer = setTimeout(() => { if (!ready) reportBlocked('timeout'); }, READY_TIMEOUT_MS);
+
     loadAPI().then(YT => {
       if (destroyed) return;
       player = new YT.Player(el, {
@@ -90,10 +123,18 @@ const VideoGate = (() => {
           controls: 1, rel: 0, disablekb: 1, fs: 1, modestbranding: 1, playsinline: 1,
         },
         events: {
+          onReady() { ready = true; clearTimeout(readyTimer); },
+          onError(e) { reportBlocked('error:' + e.data); },
           onStateChange(e) {
+            if (e.data === YT.PlayerState.BUFFERING) {
+              if (!stallTimer) stallTimer = setTimeout(() => reportBlocked('stalled'), STALL_TIMEOUT_MS);
+            } else {
+              clearStall();
+            }
             if (e.data === YT.PlayerState.PLAYING) {
               lastTick = Date.now();
               if (!poller) poller = setInterval(tick, 500);
+              if (opts.onPlaying) opts.onPlaying();
             } else {
               tick();
               stopPoll();
@@ -101,11 +142,13 @@ const VideoGate = (() => {
           },
         },
       });
-    });
+    }, () => reportBlocked('api'));
 
     return {
       destroy() {
         destroyed = true;
+        clearTimeout(readyTimer);
+        clearStall();
         stopPoll();
         if (player && player.destroy) try { player.destroy(); } catch { /* ignore */ }
       },
