@@ -58,7 +58,7 @@ function harness(t, initial = {}) {
   const oldActivity = Date.now() - 8 * 86400000;
   fs.writeFileSync(path.join(dataDir, 'students', oid, 'profile.json'), JSON.stringify({ oid, name: 'Reader', lastSeen: oldActivity }));
   const requests = [], reviews = [], controls = [], timers = new Map(), elements = new Map(), latest = new Map();
-  const activityControls = [], doc = surface(), win = surface();
+  const videoOptions = [], activityControls = [], doc = surface(), win = surface();
   let nextTimer = 0, handler, nextVerdict = verdict(false), aiGate = null, failWrite = false;
   const serverRequire = createRequire(path.join(root, 'server.js'));
   const context = vm.createContext({
@@ -119,8 +119,9 @@ function harness(t, initial = {}) {
   }
 
   const client = vm.createContext({
-    WORKSHEETS, initialState, fetch: request, window: win,
+    WORKSHEETS, initialState, fetch: request, window: win, confirm: () => true,
     dashApp: { boot() {} },
+    VideoGate: { create(opts) { videoOptions.push(opts); return { destroy() {} }; } },
     localStorage: { getItem: () => null }, location: { hash: '#/' },
     document: Object.assign(doc, {
       body: element(),
@@ -144,12 +145,26 @@ function harness(t, initial = {}) {
     $ = () => ({ innerHTML: '' });
     window.BuildersGears = { gearSVG: () => '', initScrollGears() {} };
     globalThis.app = { saveState, submitReview, saveJournal, stepState, boot, checkApprovals,
+      skipVideo, completeVideo, redoStep, parseBuilderFile, stepBodyHTML, mountVideo,
+      destroyVideos() { activeGates.forEach(g => g.destroy()); activeGates = []; },
+      reload(value) { state = normalizeState(value); },
       set viewing(student) { viewingAs = student; },
       get state() { return state; }, get pendingSaves() { return savesInFlight; } };
   `, client);
   t.after(async () => { timers.clear(); await settle(); });
   return {
-    app: client.app, requests, reviews, latest, doc, win, oldActivity,
+    app: client.app, requests, reviews, latest, doc, win, oldActivity, videoOptions,
+    mountVideo() {
+      const { section, step } = videoStep();
+      const id = VIDEO_KEY.replace(/[^\w-]/g, "_");
+      const help = { hidden: true, innerHTML: "" };
+      elements.set("yt-" + id, {}); elements.set("vhelp-" + id, help);
+      client.app.mountVideo(section, step);
+      return help;
+    },
+    fireTimer(ms) {
+      for (const [id, timer] of timers) if (timer.ms === ms) { timers.delete(id); timer.fn(); }
+    },
     set verdict(value) { nextVerdict = value; },
     holdAI() { aiGate = gate(); return aiGate; },
     controlSave(control) { controls.push(control); },
@@ -438,3 +453,104 @@ for (const timing of ['queued save', 'AI review']) {
     assert.equal(h.saved().steps[key].status, 'pending');
   });
 }
+
+
+const VIDEO_KEY = require('../curriculum.js').coreStepKeys.find(k => require('../curriculum.js').stepByKey(k).type === 'video');
+const videoStep = () => prompts.findStep(...VIDEO_KEY.split('/'));
+
+test('skipped video persists without XP; reload and Redo still allow exactly one payout', async t => {
+  const h = harness(t, { xp: 100 });
+  h.app.skipVideo(VIDEO_KEY, 'error:150');
+  await h.idle();
+  assert.equal(h.saved().steps[VIDEO_KEY].videoSkipped, 'error:150');
+  assert.equal(h.saved().xp, 100);
+  assert.equal(h.saved().steps[VIDEO_KEY].xpAwarded, undefined);
+  h.app.reload(h.saved());
+  assert.equal(h.app.state.steps[VIDEO_KEY].xpAwarded, undefined, 'reload is not a watch');
+  const { section, step } = videoStep();
+  const card = h.app.stepBodyHTML(section, step, 'done');
+  assert.match(card, /Segment skipped/);
+  assert.doesNotMatch(card, /class="xpgain"/);
+  h.app.completeVideo(section, step); // late callback from the skipped player
+  assert.equal(h.app.state.xp, 100);
+  h.app.redoStep(VIDEO_KEY);
+  assert.equal(h.app.state.steps[VIDEO_KEY].videoSkipped, undefined);
+  h.app.completeVideo(section, step);
+  h.app.completeVideo(section, step);
+  await h.idle();
+  assert.equal(h.saved().xp, 100 + step.xp);
+  h.app.redoStep(VIDEO_KEY);
+  h.app.skipVideo(VIDEO_KEY, 'stalled');
+  await h.idle();
+  assert.equal(h.saved().xp, 100 + step.xp, 'skip never adds or removes banked XP');
+});
+
+test('imported skipped video stays unpaid through normalization while legacy watched steps keep their latch', t => {
+  const h = harness(t);
+  const { section, step } = videoStep();
+  const ws = WORKSHEETS.find(w => w.sections.includes(section));
+  const imported = h.app.parseBuilderFile([
+    '# Builders Club — Builder File', '# ' + ws.title,
+    '## ' + section.num + '. ' + section.title, '### ' + step.title,
+    '_Skipped segment 0:00–1:00 of youtube.com/watch?v=example_',
+  ].join('\n'));
+  h.app.reload(copy(imported));
+  assert.equal(h.app.state.steps[VIDEO_KEY].videoSkipped, 'imported');
+  assert.equal(h.app.state.steps[VIDEO_KEY].xpAwarded, undefined);
+  h.app.reload({ steps: { [VIDEO_KEY]: { status: 'done' } } });
+  assert.equal(h.app.state.steps[VIDEO_KEY].xpAwarded, true, 'legacy migration still works');
+});
+
+test('queued video skip, activity, and immediate AI review preserve skipped state without XP', async t => {
+  const h = harness(t, { steps: { [RESEARCH]: accepted(NEW) }, xp: 100 });
+  await h.app.boot();
+  await h.idle();
+  const lastSeen = h.profile().lastSeen;
+  const slow = gate();
+  h.controlSave({ before: slow });
+  h.app.skipVideo(VIDEO_KEY, 'stalled');
+  const scene = h.input(SCENE, SUBMISSION);
+  const reviewing = h.app.submitReview(scene.section, scene.step);
+  await h.idle();
+  assert.equal(h.reviews.length, 0);
+  slow.release();
+  await reviewing;
+  await h.idle();
+  assert.equal(h.reviews[0].persisted.steps[VIDEO_KEY].videoSkipped, 'stalled');
+  assert.equal(h.saved().steps[VIDEO_KEY].videoSkipped, 'stalled');
+  assert.equal(h.saved().steps[SCENE].attempts, 1);
+  assert.equal(h.saved().xp, 100);
+  assert.equal(h.profile().lastSeen, lastSeen, 'saving a skip is not a fabricated visit');
+});
+
+test('instructor read-only view cannot skip or complete a student video', async t => {
+  const h = harness(t);
+  h.app.viewing = { oid: 'another-student' };
+  h.app.skipVideo(VIDEO_KEY, 'api');
+  const { section, step } = videoStep();
+  h.app.completeVideo(section, step);
+  await h.idle();
+  assert.deepEqual(h.saved().steps, {});
+  assert.equal(h.requests.length, 0);
+});
+
+test('video skip offer appears on timeout, hides when playing, and renders blocked reasons safely', async t => {
+  const h = harness(t);
+  const help = h.mountVideo();
+  assert.equal(help.hidden, true);
+  h.fireTimer(20000);
+  assert.equal(help.hidden, false);
+  assert.match(help.innerHTML, /data-skipreason="no-play"/);
+  h.videoOptions[0].onPlaying();
+  assert.equal(help.hidden, true);
+  h.videoOptions[0].onBlocked('error:150');
+  assert.equal(help.hidden, false);
+  assert.match(help.innerHTML, /data-skipreason="error:150"/);
+  h.videoOptions[0].onPlaying();
+  assert.equal(help.hidden, true, 'recovered playback removes the blocked offer too');
+  h.app.destroyVideos();
+  const second = h.mountVideo();
+  h.app.destroyVideos();
+  h.fireTimer(20000);
+  assert.equal(second.hidden, true, 'navigation cancels the fallback timer');
+});

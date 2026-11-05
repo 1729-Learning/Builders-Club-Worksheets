@@ -73,7 +73,14 @@ var aggregate = (function () {
           if (st.status === 'done') {
             sDone++; wDone++;
             if (w.extra) extraStepsDone++;
-            else { stepsDone++; xpEarned += curriculum.xpForCompletedStep(step.key); wXp += curriculum.xpForCompletedStep(step.key); }
+            else {
+              stepsDone++;
+              // Skipping clears the gate without paying XP. A previously watched
+              // video may have banked XP before a Redo, which must stay banked.
+              const paid = st.video && st.video.skipped && !st.alreadyEarnedXp
+                ? 0 : curriculum.xpForCompletedStep(step.key);
+              xpEarned += paid; wXp += paid;
+            }
             if (step.isArtifact) artifactDone = true;
             if (!w.extra && (!furthestStep || step.ordinal > furthestStep.ordinal)) furthestStep = step;
             /* "Most recently finished" by curriculum position, not by date: only

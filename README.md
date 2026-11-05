@@ -22,7 +22,7 @@ Sign in with the same account every time and your work is always there. That's t
 
 - **Your answers save themselves** as you type — there is no save button for drafts, and you can close the tab whenever you like.
 - **It works on a phone or a laptop**, and you can switch between them. Your work follows your account, not the device.
-- **Video steps** play a segment of a video picked for its quality; the next step unlocks when it finishes.
+- **Video steps** play a segment of a video picked for its quality; the next step unlocks when it finishes. If a school network blocks YouTube, the player detects it and offers a skip; it also offers one if the video still hasn't started after 20 seconds. A skipped video earns no XP until it's watched with Redo, and the mentor dashboard counts it as skipped.
 - **Exercise steps** are reviewed by the AI against that step's rubric. The goal is to iterate towards a good response, not to get graded or rush towards completion.
 - **Journal steps** are private reflections; the AI can reference them later to connect ideas.
 - Finished sections mint **artifacts** — the tangible outputs (problem statement, MVP plan, …).

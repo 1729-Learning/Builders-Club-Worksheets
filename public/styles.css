@@ -255,6 +255,10 @@ textarea.answer:disabled{cursor:not-allowed}
 .video-progress{flex:1 1 160px;height:12px;border:2px solid var(--ink);border-radius:999px;background:var(--pad-2);overflow:hidden;box-shadow:var(--shadow-sm)}
 .video-progress .vp-fill{height:100%;background:var(--accent);width:0%;transition:width .5s linear}
 .video-readout{font-family:var(--font-mono);font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap}
+.video-help{margin-top:12px;background:var(--pad-2);border:2px dashed var(--ink);border-radius:var(--radius-sm);padding:11px 14px}
+.video-help p{margin:0 0 9px;font-size:13.5px;line-height:1.5}
+.video-help-note{font-size:13.5px;line-height:1.55;margin:12px 0 0}
+.done-stamp.skipped .big{color:var(--muted)}
 .recap{margin-top:18px;background:var(--blue-tint);border:2.5px solid var(--ink);border-radius:var(--radius-sm);padding:13px 15px;box-shadow:var(--shadow-sm)}
 .recap h4{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 8px;color:var(--accent-h)}
 .recap ul{margin:0;padding-left:18px}

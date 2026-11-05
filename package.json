@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "ALLOW_DEV_LOGIN=1 node server.js",
-    "test": "node test/run.js && node --test test/review-save.test.js && node --test test/activity.js"
+    "test": "node test/run.js && node --test test/review-save.test.js && node --test test/activity.js && node --test test/video.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

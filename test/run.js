@@ -145,6 +145,15 @@ check('records keep a finished video even though it has no answer', () => {
   assert.strictEqual(rec.steps[VIDEO].video.watchedSeconds, 130);
 });
 
+check('records flag a video that was skipped rather than watched', () => {
+  const rec = toRec({ [VIDEO]: { status: 'done', answer: '', attempts: 0, thread: [], videoSkipped: 'error:150' } });
+  assert.strictEqual(rec.steps[VIDEO].status, 'done');
+  assert.strictEqual(rec.steps[VIDEO].video.skipped, 'error:150');
+  assert.strictEqual(rec.steps[VIDEO].video.watchedSeconds, 0);
+  const watched = toRec({ [VIDEO]: { status: 'done', answer: '', attempts: 0, thread: [], maxWatched: 130 } });
+  assert.strictEqual(watched.steps[VIDEO].video.skipped, null);
+});
+
 check('records keep half-written work that was never submitted', () => {
   const rec = toRec({ [GRADED]: { status: 'pending', answer: 'half a thought', attempts: 0, thread: [] } });
   assert.strictEqual(rec.steps[GRADED].status, 'inProgress');
@@ -641,6 +650,18 @@ check('prompts draft the pitch outline from other sections\' work', () => {
 });
 
 /* ------------------------------------------------------------------ */
+
+check('aggregate skipped videos clear progress without XP, including record digests', () => {
+  for (const banked of [false, true]) {
+    const full = toRec({ [VIDEO]: { status: 'done', videoSkipped: 'stalled', xpAwarded: banked } });
+    for (const r of [full, records.digest(full)]) {
+      const p = aggregate.computeStudentProgress(r, CURRICULUM);
+      assert.strictEqual(p.frontier, 1);
+      assert.strictEqual(p.xpEarned, banked ? CURRICULUM.xpForCompletedStep(VIDEO) : 0);
+      assert.strictEqual(p.perWorksheet.reduce((n, w) => n + w.xp, 0), p.xpEarned);
+    }
+  }
+});
 
 console.log(`\n${pass} passed, ${fail} failed${skip ? `, ${skip} skipped` : ''}\n`);
 process.exit(fail ? 1 : 0);
