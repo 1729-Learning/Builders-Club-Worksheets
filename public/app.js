@@ -2519,6 +2519,13 @@ async function boot() {
   showWho();
   route();
   startApprovalPoll();
+  WorksheetActivity.start({
+    eligible: () => me.role === 'student' && !!state && !viewingAs,
+    send: async () => {
+      const res = await api('/api/activity', { method: 'POST' });
+      if (!res.ok) throw new Error('activity unavailable');
+    },
+  });
   // The web fonts land after the first render and change how the text wraps,
   // so measure again once they're in.
   if (document.fonts) document.fonts.ready.then(() => { sizeListBoxes(); sizeRecapBoxes(); });
