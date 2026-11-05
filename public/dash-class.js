@@ -10,14 +10,14 @@
   The BOARD answers a different question — "who needs me today" — by sorting every
   builder into exactly one of three states:
 
-      Dormant     hasn't opened the worksheets in a week
+      Dormant     last recorded worksheet activity was over a week ago
       Behind      below the class median, or stuck on a step
       On track    at or past the median, nothing stuck
 
   The states are deliberately exhaustive and mutually exclusive, in that order of
   urgency: everyone is in exactly one column, so the columns add up to the class.
-  Someone both dormant and behind appears under Dormant, because they have
-  stopped showing up and that is the more useful fact.
+  Someone both dormant and behind appears under Dormant. Missing activity
+  history is unknown, not proof of either a visit or an absence.
 
   Colour is load-bearing here, so it is kept honest in one place, `cellState`
   below. Coral only ever means "a human should look at this".
@@ -29,7 +29,7 @@ var viewClass = (function () {
   const DORMANT_DAYS = 7;
 
   const GROUPS = [
-    { key: 'dormant', title: 'Dormant', note: `Not seen in ${DORMANT_DAYS} days.` },
+    { key: 'dormant', title: 'Dormant', note: `Last recorded activity over ${DORMANT_DAYS} days ago.` },
     { key: 'behind', title: 'Behind', note: 'Below the class median, or stuck on a step.' },
     { key: 'ontrack', title: 'On track', note: 'At or past the median, nothing stuck.' },
   ];
@@ -90,21 +90,22 @@ var viewClass = (function () {
 
   /* ---------------------------------------------------------------- rows */
 
-  function buildRows(app) {
+  function buildRows(app, now = Date.now()) {
     const S = store.STATE;
     const records = S.records;
     const roll = aggregate.buildCohortRollup(records, CURRICULUM, S.roster.students);
     const flags = aggregate.buildFlags(records, CURRICULUM, S.roster.students);
     const med = roll.medianFrontier;
     const stuckIds = new Set(flags.filter(f => f.code === 'stuck').map(f => f.studentId));
-    const cutoff = Date.now() - DORMANT_DAYS * 86400000;
+    const cutoff = now - DORMANT_DAYS * 86400000;
 
     const rows = records.map(rec => {
       const p = aggregate.computeStudentProgress(rec, CURRICULUM);
       const stuck = stuckIds.has(p.studentId);
-      const dormant = !!rec.lastSeen && rec.lastSeen < cutoff;
+      const activityKnown = Number.isFinite(rec.lastSeen) && rec.lastSeen > 0;
+      const dormant = activityKnown && rec.lastSeen < cutoff;
       return {
-        id: p.studentId, name: p.name, rec, progress: p, stuck, dormant,
+        id: p.studentId, name: p.name, rec, progress: p, stuck, dormant, activityKnown,
         behindBy: med == null ? null : med - p.frontier,
         state: dormant ? 'dormant' : (stuck || (med != null && p.frontier < med)) ? 'behind' : 'ontrack',
       };
@@ -184,7 +185,7 @@ var viewClass = (function () {
             <h2>${ui.esc(g.title)}</h2><span class="n">${g.rows.length}</span>
           </div>
           ${g.rows.length ? g.rows.map(boxHTML).join('')
-    : `<p class="board-empty">${ui.esc(g.key === 'dormant' ? 'Everyone has been in this week.' : g.key === 'behind' ? 'Nobody is behind.' : 'Nobody here yet.')}</p>`}
+    : `<p class="board-empty">${ui.esc(g.key === 'dormant' ? 'No recorded activity is over a week old.' : g.key === 'behind' ? 'Nobody is behind.' : 'Nobody here yet.')}</p>`}
         </div>`).join('')}
     </div>`;
   }
@@ -196,6 +197,7 @@ var viewClass = (function () {
         <div class="sbox-main">
           <div class="sbox-name">${ui.esc(row.name)}</div>
           <div class="sbox-sub">${p.frontier}/${p.stepsTotal} steps · ${p.xpEarned} XP${row.stuck ? ' · stuck' : ''}</div>
+          ${row.activityKnown ? '' : '<div class="sbox-sub">Activity unknown</div>'}
         </div>
         <div class="sbox-last">
           <span class="kicker">Last finished</span>
@@ -222,6 +224,7 @@ var viewClass = (function () {
         <span class="z">
           <span class="z-name">${ui.esc(row.name)}</span>
           <span class="z-label">${p.frontier}/${p.stepsTotal} steps · ${p.xpEarned} XP</span>
+          ${row.activityKnown ? '' : '<span class="z-label">Activity unknown</span>'}
         </span>
         <span class="z">
           <span class="z-label">Last finished</span>
@@ -265,6 +268,10 @@ var viewClass = (function () {
         </div>
 
         ${view === 'grid' ? gridHTML(rows) : view === 'board' ? boardHTML(grouped) : listHTML(grouped)}
+
+        <p class="sec-tagline">Dormant means the last recorded activity was over seven days ago.
+        Foreground visits count even without edits; activity updates at most every five minutes.
+        Activity unknown means there is no recorded visit time; standing then reflects progress only.</p>
 
         ${ui.card(`
           <div class="card-head"><div class="kicker">Backup</div></div>

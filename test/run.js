@@ -651,5 +651,17 @@ check('prompts draft the pitch outline from other sections\' work', () => {
 
 /* ------------------------------------------------------------------ */
 
+check('aggregate skipped videos clear progress without XP, including record digests', () => {
+  for (const banked of [false, true]) {
+    const full = toRec({ [VIDEO]: { status: 'done', videoSkipped: 'stalled', xpAwarded: banked } });
+    for (const r of [full, records.digest(full)]) {
+      const p = aggregate.computeStudentProgress(r, CURRICULUM);
+      assert.strictEqual(p.frontier, 1);
+      assert.strictEqual(p.xpEarned, banked ? CURRICULUM.xpForCompletedStep(VIDEO) : 0);
+      assert.strictEqual(p.perWorksheet.reduce((n, w) => n + w.xp, 0), p.xpEarned);
+    }
+  }
+});
+
 console.log(`\n${pass} passed, ${fail} failed${skip ? `, ${skip} skipped` : ''}\n`);
 process.exit(fail ? 1 : 0);

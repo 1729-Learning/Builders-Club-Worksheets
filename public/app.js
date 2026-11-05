@@ -116,20 +116,35 @@ function hideAuthBanner() {
 let state = null;
 let saveTimer = null;
 let savesInFlight = 0;
+let saveQueue = Promise.resolve();
 let appSettings = { freeRoam: false }; // refreshed from /api/settings at boot and on settings changes
 
-function saveState(immediate) {
+function saveState(immediate, { required = false } = {}) {
   if (viewingAs) return Promise.resolve(); // an instructor reading a student's work never writes to it
   clearTimeout(saveTimer);
   saveTimer = null;
   const doSave = () => {
+    // Capture before queuing: another edit or an instructor view can change
+    // `state` while an older request is still on its way to the server.
+    const body = JSON.stringify(state);
     savesInFlight++;
-    return api('/api/state', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
-    }).then(r => r.json())
+    // Full-state writes must arrive in order, or an older autosave could land
+    // after the save a review waited for and put its prerequisites back in time.
+    const saved = saveQueue.then(async () => {
+      const res = await api('/api/state', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body,
+      });
+      if (!res.ok) throw new Error('could not save worksheet state');
+      const out = await res.json();
+      if (!out || out.ok !== true) throw new Error('save was not acknowledged');
+      return out;
+    }).finally(() => { savesInFlight--; });
+    // A failed background save must not prevent a later full-state save.
+    saveQueue = saved.catch(() => {});
+    return saved
       // The server put back an instructor's approval this tab hadn't seen.
-      .then(out => { savesInFlight--; if (out && out.reload) reloadOwnState(); })
-      .catch(() => { savesInFlight--; });
+      .then(out => { if (out.reload) reloadOwnState(); })
+      .catch(err => { if (required) throw err; });
   };
   if (immediate) return doSave();
   saveTimer = setTimeout(doSave, 500);
@@ -1530,7 +1545,7 @@ function mountVideo(section, step) {
       saveState();
     },
     onComplete() { completeVideo(section, step); },
-    onPlaying() { started = true; if (!blockedReason) hideHelp(); },
+    onPlaying() { started = true; blockedReason = null; hideHelp(); },
     onBlocked(reason) { blockedReason = reason; showHelp(); },
   }));
 }
@@ -1718,6 +1733,7 @@ function setAnswerBusy(k, busy) {
 let inflightWork = null;
 
 async function submitReview(section, step) {
+  if (inflightWork) return inflightWork;
   let done;
   inflightWork = new Promise(r => { done = r; });
   try {
@@ -1772,11 +1788,16 @@ async function submitReviewInner(section, step) {
 
   // Every submitted version lives in the history, so revisions stay reviewable.
   st.thread.push({ role: 'user', text: val, attempt: st.attempts });
-  setLatest(k, spinnerHTML(st.attempts === 1 ? 'Reviewing your answer… this can take a minute.' : 'Re-checking your revision… this can take a minute.'));
-  saveState();
+  setLatest(k, spinnerHTML('Saving your work before review…'));
 
   let verdict;
+  let savedForReview = false;
   try {
+    // Cancel the debounce, wait behind older writes, and require the server's
+    // acknowledgement before /api/review reads the supporting work from disk.
+    await saveState(true, { required: true });
+    savedForReview = true;
+    setLatest(k, spinnerHTML(st.attempts === 1 ? 'Reviewing your answer… this can take a minute.' : 'Re-checking your revision… this can take a minute.'));
     const res = await api('/api/review', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1795,7 +1816,9 @@ async function submitReviewInner(section, step) {
       pass: false, offline: true,
       feedback: e.name === 'AuthError'
         ? 'Your sign-in expired. Use the banner at the top to sign in again, then resubmit — this attempt wasn’t counted.'
-        : 'Couldn’t reach Builders AI — check your connection and try again. This attempt wasn’t counted.',
+        : !savedForReview
+          ? 'Couldn’t save your work, so no review was requested. Your answer is still here — check your connection and resubmit. This attempt wasn’t counted.'
+          : 'Couldn’t reach Builders AI — check your connection and try again. This attempt wasn’t counted.',
       reasons: [], hint: '', masteryFlags: [],
     };
   }
@@ -2497,9 +2520,9 @@ function normalizeState(s) {
   if (!next.mastery) next.mastery = {};
   if (typeof next.xp !== 'number') next.xp = 0;
   if (typeof next.streak !== 'number') next.streak = 0;
-  // Migrate pre-flag states: anything already done has already earned its XP.
+  // Legacy completed steps earned XP; a blocked-video skip deliberately did not.
   for (const st of Object.values(next.steps)) {
-    if (st && st.status === 'done' && st.xpAwarded === undefined) st.xpAwarded = true;
+    if (st && st.status === 'done' && !st.videoSkipped && st.xpAwarded === undefined) st.xpAwarded = true;
   }
   return next;
 }
@@ -2560,6 +2583,13 @@ async function boot() {
   showWho();
   route();
   startApprovalPoll();
+  WorksheetActivity.start({
+    eligible: () => me.role === 'student' && !!state && !viewingAs,
+    send: async () => {
+      const res = await api('/api/activity', { method: 'POST' });
+      if (!res.ok) throw new Error('activity unavailable');
+    },
+  });
   // The web fonts land after the first render and change how the text wraps,
   // so measure again once they're in.
   if (document.fonts) document.fonts.ready.then(() => { sizeListBoxes(); sizeRecapBoxes(); });

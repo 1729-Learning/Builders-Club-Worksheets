@@ -280,6 +280,13 @@ async function handleApi(req, res, pathname, url) {
   if (!user) return;
   const oid = user.oid;
 
+  // Explicit foreground activity only. In particular, /api/me, state reads and
+  // the approval poll must never refresh this timestamp on their own.
+  if (pathname === '/api/activity' && method === 'POST') {
+    if (user.role === 'student') store.touchLastSeen(oid);
+    return sendJSON(res, 200, { ok: true });
+  }
+
   if (pathname === '/api/state' && method === 'GET') {
     return sendJSON(res, 200, store.readState(oid));
   }
@@ -296,7 +303,8 @@ async function handleApi(req, res, pathname, url) {
     const merged = approvals.mergeApprovals(body, store.readApprovals(oid), prompts.findStep);
     body.meta = Object.assign({}, body.meta, { version: 1, updatedAt: Date.now() });
     store.writeState(oid, body);
-    store.touchLastSeen(oid);
+    // Saves may also come from video progress or delayed background work.
+    // /api/activity records foreground visits independently of saving.
     return sendJSON(res, 200, merged ? { ok: true, reload: true } : { ok: true });
   }
 

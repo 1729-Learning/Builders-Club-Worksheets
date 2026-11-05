@@ -95,6 +95,16 @@ Optionally set `ALLOWED_EMAIL_DOMAINS=yourschool.edu` to limit who can get in. W
 | **A builder** | Everything one student wrote, section by section. **Print one-pager** gives you a sheet for a 1:1; **Read their worksheets** opens their account exactly as they see it, read-only. |
 | **XP** | The leaderboard, plus **Copy CSV** for a gradebook. |
 
+The Class Board marks a student **Dormant** when their last recorded activity
+was more than seven days ago. Signing in, opening or returning to a visible,
+focused worksheet tab, and interacting with it count even without edits.
+An idle tab, background saves and automatic approval polling do not refresh
+activity. Activity requests and their profile writes are each limited to once per five
+minutes; there is no periodic activity heartbeat. Only the existing `lastSeen`
+timestamp is stored, with no page history or event details. Older profiles with
+no timestamp show **Activity unknown**, and their standing reflects progress
+only until an actual visit is recorded.
+
 ### Reading the class grid
 
 | | |

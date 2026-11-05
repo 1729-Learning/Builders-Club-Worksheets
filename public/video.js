@@ -22,16 +22,29 @@ const VideoGate = (() => {
   const STALL_TIMEOUT_MS = 15000; // buffering this long without playing → stream blocked
 
   function loadAPI() {
+    if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
     if (apiPromise) return apiPromise;
     apiPromise = new Promise((resolve, reject) => {
-      if (window.YT && window.YT.Player) return resolve(window.YT);
       const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT); };
       const tag = document.createElement('script');
+      let settled = false;
+      const finish = error => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (window.onYouTubeIframeAPIReady === onReady) window.onYouTubeIframeAPIReady = prev;
+        if (error) { apiPromise = null; tag.remove(); reject(error); }
+        else resolve(window.YT);
+      };
+      const onReady = () => { finish(); if (prev) prev(); };
+      window.onYouTubeIframeAPIReady = onReady;
+      // A silently filtered script must not leave a cached pending promise
+      // forever: a later Redo on a working network needs a fresh attempt.
+      const timer = setTimeout(() => finish(new Error('timeout')), READY_TIMEOUT_MS);
       tag.src = 'https://www.youtube.com/iframe_api';
       // A blocked script never fires onYouTubeIframeAPIReady. Forget the promise
       // so a later mount (e.g. after the network changes) tries again.
-      tag.onerror = () => { apiPromise = null; tag.remove(); reject(new Error('api')); };
+      tag.onerror = () => finish(new Error('api'));
       document.head.appendChild(tag);
     });
     return apiPromise;
@@ -44,7 +57,7 @@ const VideoGate = (() => {
     - onProgress({maxWatched, watchedSeconds, pct}) fires ~2x/sec while playing
     - onComplete() fires once when the segment is genuinely finished
     - onPlaying() fires each time playback actually starts
-    - onBlocked(reason) fires at most once when the video can't be played here
+    - onBlocked(reason) fires once per failure, rearmed if playback recovers
     Returns { destroy() }.
   */
   function create(opts) {
@@ -74,7 +87,7 @@ const VideoGate = (() => {
     function stopPoll() { if (poller) { clearInterval(poller); poller = null; } lastTick = null; }
 
     function tick() {
-      if (!player || completed) return;
+      if (!player || completed || destroyed) return;
       let t;
       try { t = player.getCurrentTime(); } catch { return; }
       const now = Date.now();
@@ -123,15 +136,17 @@ const VideoGate = (() => {
           controls: 1, rel: 0, disablekb: 1, fs: 1, modestbranding: 1, playsinline: 1,
         },
         events: {
-          onReady() { ready = true; clearTimeout(readyTimer); },
+          onReady() { if (destroyed) return; ready = true; clearTimeout(readyTimer); },
           onError(e) { reportBlocked('error:' + e.data); },
           onStateChange(e) {
+            if (destroyed || completed) return;
             if (e.data === YT.PlayerState.BUFFERING) {
               if (!stallTimer) stallTimer = setTimeout(() => reportBlocked('stalled'), STALL_TIMEOUT_MS);
             } else {
               clearStall();
             }
             if (e.data === YT.PlayerState.PLAYING) {
+              blocked = false; // a later stall after recovery needs its own offer
               lastTick = Date.now();
               if (!poller) poller = setInterval(tick, 500);
               if (opts.onPlaying) opts.onPlaying();
@@ -142,7 +157,7 @@ const VideoGate = (() => {
           },
         },
       });
-    }, () => reportBlocked('api'));
+    }).catch(error => reportBlocked(error.message === 'timeout' ? 'timeout' : 'api'));
 
     return {
       destroy() {
