@@ -223,6 +223,20 @@ body{margin:0;background:var(--pad);color:var(--ink);font-family:var(--font-body
 .ex.bad{background:var(--coral-tint)} .ex.bad .tag{color:var(--red-deep)}
 .ex em{font-style:normal;color:var(--muted)}
 
+/* worked-example panel — the lesson panel's shell, tinted blue so it reads as "someone else's answer" */
+.lesson.example{background:var(--blue-tint)}
+.lesson.example.open{max-height:560px}
+.lesson.example .ex-note{font-size:13px;color:var(--muted);margin:0 0 10px}
+.lesson.example .ex-note em{font-style:italic;color:var(--ink)}
+.ex-list{margin:0 0 12px;padding-left:22px;font-size:14px;line-height:1.5}
+.ex-list li{margin:0 0 6px}
+.ex-text{background:#fff;border:2px solid var(--ink);border-radius:var(--radius-sm);padding:10px 12px;margin:0 0 12px;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.ex-label{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.ex-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:0 0 12px}
+.ex-col{background:#fff;border:2px solid var(--ink);border-radius:var(--radius-sm);padding:8px 10px}
+.ex-col ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.45}
+.ex-col li{margin:0 0 5px}
+
 /* answer area */
 .answer-wrap{margin:22px 0 0}
 .field-label{font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px}
