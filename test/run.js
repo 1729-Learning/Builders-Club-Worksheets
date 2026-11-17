@@ -734,7 +734,8 @@ check('examples are shown to the reviewer, so a copied example cannot pass unnot
   const covered = prompts.findStep('problem-statement', 'transform-2');
   const p = prompts.buildReviewPrompt({ ...covered, answer: 'x', attempt: 1, state: emptyState });
   assert.ok(p.includes('Worked example the student can see'), 'covered step carries the example');
-  assert.ok(p.includes('Priya'), 'names the example people to watch for');
+  assert.ok(p.includes('Overlap is NOT copying'), 'a shared topic or name alone never fails an original answer');
+  assert.ok(p.includes('Judge any original submission on the rubric alone'), 'original work keeps the rubric-only bar');
   assert.ok(prompts.buildPortablePrompt({ ...covered, answer: 'x', attempt: 1, state: emptyState }).includes('Worked example the student can see'));
   const bare = prompts.findStep('go-live', 'github-account');
   assert.ok(!prompts.buildReviewPrompt({ ...bare, answer: 'x', attempt: 1, state: emptyState }).includes('Worked example'), 'no example, no block');
