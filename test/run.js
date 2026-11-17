@@ -720,13 +720,24 @@ check('examples honor the rubric limits a reader would check first', () => {
 });
 
 check('examples serialize fields and boards the way the app stores them', () => {
-  const people = CURRICULUM.stepByKey('user-needs/outreach-plan');
-  const text = EXAMPLES.answerText(WORKSHEETS[0].sections.find(s => s.id === 'user-needs').steps.find(s => s.id === people.id),
-    EXAMPLES.steps['user-needs/outreach-plan'].answer);
+  const mvp = WORKSHEETS.find(w => w.id === 'mvp');
+  const rawStep = (sec, id) => mvp.sections.find(s => s.id === sec).steps.find(s => s.id === id);
+  const text = EXAMPLES.answerText(rawStep('user-needs', 'outreach-plan'), EXAMPLES.steps['user-needs/outreach-plan'].answer);
   assert.ok(/^WHO YOU'LL CONTACT FIRST:\n1\. /.test(text), 'fields as LABEL:\\ntext');
-  const board = WORKSHEETS[0].sections.find(s => s.id === 'product-features').steps.find(s => s.id === 'prioritize');
+  const board = rawStep('product-features', 'prioritize');
   const btext = EXAMPLES.answerText(board, EXAMPLES.steps['product-features/prioritize'].answer);
   assert.ok(btext.startsWith('MUST (v1 dies without it):\n- '), 'boards as LABEL (hint):\\n- card');
+});
+
+check('examples are shown to the reviewer, so a copied example cannot pass unnoticed', () => {
+  const emptyState = { steps: {}, artifacts: {}, mastery: {} };
+  const covered = prompts.findStep('problem-statement', 'transform-2');
+  const p = prompts.buildReviewPrompt({ ...covered, answer: 'x', attempt: 1, state: emptyState });
+  assert.ok(p.includes('Worked example the student can see'), 'covered step carries the example');
+  assert.ok(p.includes('Priya'), 'names the example people to watch for');
+  assert.ok(prompts.buildPortablePrompt({ ...covered, answer: 'x', attempt: 1, state: emptyState }).includes('Worked example the student can see'));
+  const bare = prompts.findStep('go-live', 'github-account');
+  assert.ok(!prompts.buildReviewPrompt({ ...bare, answer: 'x', attempt: 1, state: emptyState }).includes('Worked example'), 'no example, no block');
 });
 
 check('examples Builder file on disk is up to date with scripts/build-example.js', () => {

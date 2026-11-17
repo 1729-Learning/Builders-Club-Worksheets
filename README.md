@@ -192,7 +192,7 @@ Open <http://localhost:4321> and click **Dev sign-in**. No Entra tenant needed.
 Dev sign-in refuses to run if `MS_CLIENT_ID` is set or `NODE_ENV=production`, so it cannot be reached on a deployed site.
 
 ```bash
-npm test          # 60 checks, no dependencies
+npm test          # 61 checks, no dependencies
 node test/run.js --only=grid --verbose
 ```
 
@@ -249,7 +249,7 @@ GitHub Actions runs three things on every pull request, on Node 20 and 22: that 
 
 ## The worked example
 
-[`public/examples.js`](public/examples.js) holds one project answered against every step of the MVP worksheet, Sections 1–4 and 6, with simulated interviews that are labeled as simulated. The worksheets show it inline through the 💡 Example button. [`scripts/build-example.js`](scripts/build-example.js) turns the same data into [`docs/examples/tableview-builder-file.md`](docs/examples/tableview-builder-file.md): a readable write-up that is also a real Builder file, so ⚙ Settings → Upload Builder file loads it into a test account. After editing an example, run `node scripts/build-example.js`. The test suite fails if the file is stale, or if an answer no longer fits its step's shape (box counts, field ids, board columns).
+[`public/examples.js`](public/examples.js) holds one project answered against every step of the MVP worksheet, Sections 1–4 and 6, with simulated interviews that are labeled as simulated. The worksheets show it inline through the 💡 Example button. [`scripts/build-example.js`](scripts/build-example.js) turns the same data into [`docs/examples/tableview-builder-file.md`](docs/examples/tableview-builder-file.md): a readable write-up that is also a real Builder file, so ⚙ Settings → Upload Builder file loads it into a test account. After editing an example, run `node scripts/build-example.js`. The AI reviewer is shown the same example for that step, so a pasted or lightly reworded copy doesn’t pass. The test suite fails if the file is stale, or if an answer no longer fits its step's shape (box counts, field ids, board columns).
 
 ## How content works
 
