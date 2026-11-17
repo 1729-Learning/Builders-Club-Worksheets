@@ -941,6 +941,47 @@ function lessonHTML(step, k) {
     </div>`;
 }
 
+/* ---- worked example (public/examples.js) ----
+   One finished project answered against every step's real prompt, opened inline
+   from the 💡 Example button. Read-only, and about a different idea on purpose so
+   it models the thinking rather than the answer. The AI reviewer is shown the
+   same example server-side (lib/prompts.js) so it can recognize a copy. */
+
+function exampleFor(k) {
+  return typeof EXAMPLES !== 'undefined' && EXAMPLES.steps[k] ? EXAMPLES.steps[k] : null;
+}
+
+function exampleBtnHTML(k) {
+  return exampleFor(k) ? `<button class="ask-btn" data-example="${k}" title="See how one finished project answered this step">💡 Example</button>` : '';
+}
+
+function exampleHTML(step, k) {
+  const ex = exampleFor(k);
+  if (!ex) return '';
+  const a = ex.answer;
+  const text = t => esc(t).replace(/\n/g, '<br>');
+  let body;
+  if (Array.isArray(a)) {
+    body = `<ol class="ex-list">${a.map(t => `<li>${text(t)}</li>`).join('')}</ol>`;
+  } else if (typeof a === 'string') {
+    body = `<div class="ex-text">${text(a)}</div>`;
+  } else if (step.fields) {
+    body = step.fields.map(f => `<div class="ex-field"><span class="ex-label">${esc(f.label)}</span><div class="ex-text">${text(a[f.id] || '')}</div></div>`).join('');
+  } else if (step.board) {
+    body = `<div class="ex-board">${boardCols(step).map(c => `<div class="ex-col"><span class="ex-label">${esc(c.label)}</span>
+      <ul>${(a[c.key] || []).map(t => `<li>${text(t)}</li>`).join('')}</ul></div>`).join('')}</div>`;
+  } else {
+    body = `<div class="ex-text">${text(String(a))}</div>`;
+  }
+  return `
+    <div class="lesson example" id="example-${cssId(k)}">
+      <h4>Worked example · ${esc(EXAMPLES.title)} — ${esc(EXAMPLES.tagline)}</h4>
+      <p class="ex-note">A different project, so don’t copy it. Look at <em>how</em> it answers the step, then do the same for your own idea.</p>
+      ${body}
+      ${ex.why ? `<div class="ex good"><span class="tag">Why it works</span>${esc(ex.why)}</div>` : ''}
+    </div>`;
+}
+
 function cssId(k) { return k.replace(/[^\w-]/g, '_'); }
 
 // Explicit user toggles for the history dropdown (key → true = open).
@@ -1225,10 +1266,12 @@ function boardHTML(section, step, status) {
     : !done ? `<span class="req-note">at least ${step.minPerSide || 1} real moment per side</span>` : '';
   const actions = reviewed
     ? `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
+       ${exampleBtnHTML(k)}
        <button class="btn" data-review="${k}">${st.attempts > 0 ? 'Resubmit ▸' : 'Submit & Review'}</button>
        ${approveBtnHTML(step, k)}
        ${reqNote}`
     : `${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
+       ${exampleBtnHTML(k)}
        <button class="btn" data-saveboard="${k}">${done ? 'Save new cards' : 'Save scoreboard'}</button>
        ${!done ? reqNote : ''}`;
   return `
@@ -1238,6 +1281,7 @@ function boardHTML(section, step, status) {
     ${lessonHTML(step, k)}
     <div class="board cols-${cols.length}">${cols.map(col).join('')}</div>
     <div class="answer-tools">${actions}</div>
+    ${exampleHTML(step, k)}
     ${reviewed ? threadHTML(st, k) : ''}`;
 }
 
@@ -1287,6 +1331,7 @@ function stepBodyHTML(section, step, status) {
     return `${redoBtn}
       ${guide}
       <div class="prev-answer"><span class="pa-label">Your accepted answer</span>${esc(st.answer)}</div>
+      ${exampleFor(k) ? `<div class="answer-tools">${exampleBtnHTML(k)}</div>${exampleHTML(step, k)}` : ''}
       ${threadHTML(st, k)}
       <div class="done-stamp"><span class="big">${step.isArtifact ? 'Artifact earned ✓' : 'Step complete ✓'}</span>${xpPill(section, (step.xp || 15) + (step.isArtifact ? (section.xp || 0) : 0))}</div>
       ${resourcesHTML(step)}`;
@@ -1327,6 +1372,7 @@ function stepBodyHTML(section, step, status) {
       ${answerField}
       <div class="answer-tools">
         ${step.lessonPanel ? `<button class="ask-btn" data-lesson="${k}">📖 Lesson</button>` : ''}
+        ${exampleBtnHTML(k)}
         ${!isJournal ? `<button class="ask-btn" data-copyprompt="${k}" title="Copy this whole step — task, checklist, and your work so far — as a prompt you can paste into any AI chat">📋 Copy for another AI</button>` : ''}
         ${isJournal
           ? `<button class="btn" data-savejournal="${k}">Save entry</button>`
@@ -1334,6 +1380,7 @@ function stepBodyHTML(section, step, status) {
         ${approveBtnHTML(step, k)}
         ${reqNote}
       </div>
+      ${exampleHTML(step, k)}
     </div>
     ${resourcesHTML(step)}
     ${threadHTML(st, k)}`;
@@ -2264,6 +2311,14 @@ function wire() {
       const l = document.getElementById('lesson-' + cssId(lesson.dataset.lesson));
       if (l) l.classList.toggle('open');
       lesson.classList.toggle('open');
+      return;
+    }
+
+    const exb = e.target.closest('[data-example]');
+    if (exb) {
+      const panel = document.getElementById('example-' + cssId(exb.dataset.example));
+      if (panel) panel.classList.toggle('open');
+      exb.classList.toggle('open');
       return;
     }
 

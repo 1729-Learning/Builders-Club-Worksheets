@@ -663,5 +663,89 @@ check('aggregate skipped videos clear progress without XP, including record dige
   }
 });
 
+/* ------------------------------------------------------------------ worked example */
+
+group('examples');
+
+const EXAMPLES = require('../public/examples.js');
+const buildExample = require('../scripts/build-example.js');
+const words = s => String(s).trim().split(/\s+/).filter(w => /\w/.test(w)).length;
+
+check('examples every key names a real, non-video step', () => {
+  for (const key of Object.keys(EXAMPLES.steps)) {
+    const step = CURRICULUM.stepByKey(key);
+    assert.ok(step, `${key} is not a step`);
+    assert.notStrictEqual(step.type, 'video', `${key} is a video`);
+  }
+});
+
+check('examples cover every non-video step in the sections the Builder file includes', () => {
+  for (const id of buildExample.SECTIONS) {
+    for (const step of CURRICULUM.sectionById(id).steps) {
+      if (step.type !== 'video') assert.ok(EXAMPLES.steps[step.key], `missing example for ${step.key}`);
+    }
+  }
+});
+
+check('examples answers match each step\'s answer shape', () => {
+  for (const [key, ex] of Object.entries(EXAMPLES.steps)) {
+    const step = CURRICULUM.stepByKey(key);
+    const a = ex.answer;
+    if (step.answerShape === 'list') {
+      assert.ok(Array.isArray(a), `${key} should be a list`);
+      assert.ok(a.length >= step.list.min && a.length <= step.list.max, `${key}: ${a.length} items, wants ${step.list.min}–${step.list.max}`);
+      for (const item of a) assert.ok(item.trim() && !item.includes('\n'), `${key}: each box is one non-empty line`);
+    } else if (step.answerShape === 'fields') {
+      assert.deepStrictEqual(Object.keys(a).sort(), step.fields.map(f => f.id).sort(), key);
+    } else if (step.answerShape === 'board') {
+      assert.deepStrictEqual(Object.keys(a).sort(), step.board.map(c => c.key).sort(), key);
+    } else {
+      assert.strictEqual(typeof a, 'string', `${key} should be text`);
+    }
+    assert.ok(ex.why, `${key} explains why it works`);
+    const reviewed = step.type === 'exercise' || step.type === 'synthesis';
+    assert.strictEqual(!!ex.attempts, reviewed, `${key}: attempts only on AI-reviewed steps`);
+  }
+});
+
+check('examples honor the rubric limits a reader would check first', () => {
+  const must = EXAMPLES.steps['product-features/prioritize'].answer.must;
+  assert.ok(must.length >= 1 && must.length <= 3, 'one to three MUSTs');
+  assert.ok(words(EXAMPLES.steps['mvp-plan/final-plan'].answer) <= 160, 'MVP plan fits in 160 words');
+  const outline = EXAMPLES.steps['pitch/pitch-outline'].answer;
+  assert.strictEqual((outline.match(/^SLIDE \d/gm) || []).length, 5, 'five slides');
+  for (const line of outline.split('\n').filter(l => l.startsWith('ON SCREEN:'))) {
+    assert.ok(words(line.slice(10)) <= 8, `ON SCREEN over 8 words: ${line}`);
+  }
+});
+
+check('examples serialize fields and boards the way the app stores them', () => {
+  const mvp = WORKSHEETS.find(w => w.id === 'mvp');
+  const rawStep = (sec, id) => mvp.sections.find(s => s.id === sec).steps.find(s => s.id === id);
+  const text = EXAMPLES.answerText(rawStep('user-needs', 'outreach-plan'), EXAMPLES.steps['user-needs/outreach-plan'].answer);
+  assert.ok(/^WHO YOU'LL CONTACT FIRST:\n1\. /.test(text), 'fields as LABEL:\\ntext');
+  const board = rawStep('product-features', 'prioritize');
+  const btext = EXAMPLES.answerText(board, EXAMPLES.steps['product-features/prioritize'].answer);
+  assert.ok(btext.startsWith('MUST (v1 dies without it):\n- '), 'boards as LABEL (hint):\\n- card');
+});
+
+check('examples are shown to the reviewer, so a copied example cannot pass unnoticed', () => {
+  const emptyState = { steps: {}, artifacts: {}, mastery: {} };
+  const covered = prompts.findStep('problem-statement', 'transform-2');
+  const p = prompts.buildReviewPrompt({ ...covered, answer: 'x', attempt: 1, state: emptyState });
+  assert.ok(p.includes('Worked example the student can see'), 'covered step carries the example');
+  assert.ok(p.includes('Overlap is NOT copying'), 'a shared topic or name alone never fails an original answer');
+  assert.ok(p.includes('Judge any original submission on the rubric alone'), 'original work keeps the rubric-only bar');
+  assert.ok(prompts.buildPortablePrompt({ ...covered, answer: 'x', attempt: 1, state: emptyState }).includes('Worked example the student can see'));
+  const bare = prompts.findStep('go-live', 'github-account');
+  assert.ok(!prompts.buildReviewPrompt({ ...bare, answer: 'x', attempt: 1, state: emptyState }).includes('Worked example'), 'no example, no block');
+});
+
+check('examples Builder file on disk is up to date with scripts/build-example.js', () => {
+  const onDisk = require('fs').readFileSync(buildExample.OUT, 'utf8');
+  assert.ok(onDisk === buildExample.build(), 'stale — run: node scripts/build-example.js');
+  assert.ok(onDisk.startsWith('# Builders Club — Builder File\n'), 'starts with the header the importer looks for');
+});
+
 console.log(`\n${pass} passed, ${fail} failed${skip ? `, ${skip} skipped` : ''}\n`);
 process.exit(fail ? 1 : 0);
