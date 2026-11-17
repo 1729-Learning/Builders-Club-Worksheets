@@ -131,7 +131,7 @@ var EXAMPLES = (function () {
 
     'user-needs/need-statements': {
       answer: [
-        'A small-group tutor needs a way to know within a minute which kid is stuck or done, because quiet kids don’t signal and finishers pull others off-task (“the kid who needs me most will never put his hand up”).',
+        'A small-group tutor needs a way to know within two minutes which kid is stuck or done, because quiet kids don’t signal and finishers pull others off-task (“the kid who needs me most will never put his hand up”).',
         'A small-group tutor needs a way to see a kid’s work in progress without walking over, because laps reach each kid only every 4–6 minutes and kids hide their paper when the tutor arrives.',
         'A small-group tutor needs a way to keep and look back at each kid’s handwritten work across sessions, because papers go home and don’t come back, and phone photos go unread.',
       ],
@@ -140,7 +140,7 @@ var EXAMPLES = (function () {
     },
 
     'user-needs/top-needs': {
-      answer: 'USER: a tutor or small-group lead running 6–8 kids of mixed levels at one table during independent practice.\n1. Know within a minute which kid is stuck or done — #1 because every interview came back to it: the kid who needs help most won’t ask, and unnoticed finishers pull others off-task.\n2. See a kid’s work in progress without walking over — laps reach each kid every 4–6 minutes, and kids hide their paper when the tutor arrives.\n3. Keep and look back at each kid’s handwritten work across sessions — papers go home and don’t return; photos go unread.\nTHE GAP: laps, hands and cups all depend on the tutor being there or the kid speaking up, and iPads show everything but cost the paper. Nothing tells the tutor who’s stuck while kids keep working on paper.',
+      answer: 'USER: a tutor or small-group lead running 6–8 kids of mixed levels at one table during independent practice.\n1. Know within two minutes which kid is stuck or done — #1 because every interview came back to it: the kid who needs help most won’t ask, and unnoticed finishers pull others off-task.\n2. See a kid’s work in progress without walking over — laps reach each kid every 4–6 minutes, and kids hide their paper when the tutor arrives.\n3. Keep and look back at each kid’s handwritten work across sessions — papers go home and don’t return; photos go unread.\nTHE GAP: laps, hands and cups all depend on the tutor being there or the kid speaking up, and iPads show everything but cost the paper. Nothing tells the tutor who’s stuck while kids keep working on paper.',
       why: 'The needs are ranked, and #1 comes with a reason. The gap explains why today’s options miss need #1 in particular.',
       attempts: 1,
     },
@@ -151,7 +151,7 @@ var EXAMPLES = (function () {
       answer: [
         'Need 2 (see work without walking over) → Live table grid: one overhead camera; every kid’s paper shows as its own tile on the tutor’s laptop.',
         'Need 2 → Tap to zoom: tap a tile to see that paper full-size, sharp enough to read a fraction.',
-        'Need 1 (who’s stuck or done) → Stuck/done flags: a tile turns amber when that paper hasn’t changed for 3 minutes, green when the kid writes DONE.',
+        'Need 1 (who’s stuck or done) → Stuck/done flags: a tile turns amber when that paper hasn’t changed for 90 seconds, green when the kid writes DONE.',
         'Need 1 → “I’m stuck” card: the kid sets a printed red card on the corner of their paper; the camera sees it and their tile jumps to the top.',
         'Need 1, at class scale → Pod mode: one camera per group of 4–6 desks, so a teacher gets one grid for 30 kids.',
         'Need 3 (keep work over time) → Auto-snapshots: each kid’s paper saved to their own folder every 2 minutes and at the end, labeled with the date.',
@@ -166,7 +166,7 @@ var EXAMPLES = (function () {
       answer: {
         must: [
           'Live table grid: feasibility — one ~$100 4K webcam on a ~$40 boom stand covers 6–8 papers over USB to my laptop; nothing to charge, wire to desks or install.',
-          'Stuck/done flags: value — this IS need #1, and it’s feasible because “no new ink for 3 minutes” is a simple pixel-change check on each tile.',
+          'Stuck/done flags: value — this IS need #1, and it’s feasible because “no new ink for 90 seconds” is a simple pixel-change check on each tile.',
           'Auto-snapshots: uniqueness — no current option keeps the paper work, and it’s nearly free once the grid already has every tile.',
         ],
         should: [
@@ -184,7 +184,7 @@ var EXAMPLES = (function () {
     },
 
     'product-features/feature-list': {
-      answer: 'MUST\n- Live table grid — one overhead webcam crops every kid’s paper into its own tile on the tutor’s laptop. Serves need #2 (see work without walking over) and makes #1 possible.\n- Stuck/done flags — a tile turns amber after 3 minutes with no new writing and green when the kid writes DONE. Serves need #1 (know who’s stuck or done).\n- Auto-snapshots — each kid’s paper saved to their own folder every 2 minutes and at the end. Serves need #3 (keep work over time).\nSHOULD\n- Tap to zoom on one paper\n- Red “I’m stuck” card the camera can see\n- Pod mode: one camera per desk group, one grid for a class of 30\nCOULD\n- Mark up a snapshot and send it back\n- Smart-pen input with stroke replay',
+      answer: 'MUST\n- Live table grid — one overhead webcam crops every kid’s paper into its own tile on the tutor’s laptop. Serves need #2 (see work without walking over) and makes #1 possible.\n- Stuck/done flags — a tile turns amber after 90 seconds with no new writing and green when the kid writes DONE. Serves need #1 (know who’s stuck or done).\n- Auto-snapshots — each kid’s paper saved to their own folder every 2 minutes and at the end. Serves need #3 (keep work over time).\nSHOULD\n- Tap to zoom on one paper\n- Red “I’m stuck” card the camera can see\n- Pod mode: one camera per desk group, one grid for a class of 30\nCOULD\n- Mark up a snapshot and send it back\n- Smart-pen input with stroke replay',
       why: 'Someone who skipped the rest of the worksheet can read this cold. Each MUST says what it does and which need it serves.',
       attempts: 1,
     },
@@ -192,18 +192,18 @@ var EXAMPLES = (function () {
     /* ---------------------------------------------------------------- §4 MVP Plan */
 
     'mvp-plan/core-choice': {
-      answer: 'Core need: #1 — know within a minute which kid is stuck or done.\nFeatures making the cut: the live table grid and stuck/done flags. Snapshots stay only as “save one picture per kid at the end” — no folders, no history page yet.\nDeliberately out: pod mode for 30, the red card, zoom, mark-up, smart pens. Cutting pod mode stings, because Ms. Alvarez’s class of 30 is the bigger market. But if it doesn’t work for 7 kids at one table, it won’t work for 30.',
+      answer: 'Core need: #1 — know within two minutes which kid is stuck or done.\nFeatures making the cut: the live table grid and stuck/done flags. Snapshots stay only as “save one picture per kid at the end” — no folders, no history page yet.\nDeliberately out: pod mode for 30, the red card, zoom, mark-up, smart pens. Cutting pod mode stings, because Ms. Alvarez’s class of 30 is the bigger market. But if it doesn’t work for 7 kids at one table, it won’t work for 30.',
       why: 'It picks one need and two features, and it shrinks the third. It names what was cut and admits that cutting it hurt.',
     },
 
     'mvp-plan/testable-version': {
-      answer: 'Day one: before Tuesday group I clamp a 4K webcam on a boom stand above the table, open the TableView page on my laptop, and drag a box around each of the 7 seats (about 2 minutes). During the 20-minute practice block the laptop sits at the end of the table: each kid’s paper is a tile, tiles go amber after 3 minutes with no new writing and green when the kid writes DONE. At the end it saves one picture per kid.\nTesters: my own Tuesday group (7 kids, grades 5–7), then Priya’s Thursday group and Marcus’s math club, two sessions each.\nSuccess after 2 weeks (6 sessions): the longest a stuck kid waits before I get to them drops from ~8 minutes to under 3 (timed with a tally sheet for one session before and every session after), and the tutor keeps it running for the whole practice block in at least 5 of 6 sessions.',
+      answer: 'Day one: before Tuesday group I clamp a 4K webcam on a boom stand above the table, open the TableView page on my laptop, and drag a box around each of the 7 seats (about 2 minutes). During the 20-minute practice block the laptop sits at the end of the table: each kid’s paper is a tile, tiles go amber after 90 seconds with no new writing and green when the kid writes DONE. I’ll tune that number in the first session: too short and kids who are just thinking light up. At the end it saves one picture per kid.\nTesters: my own Tuesday group (7 kids, grades 5–7), then Priya’s Thursday group and Marcus’s math club, two sessions each.\nSuccess after 2 weeks (6 sessions): the longest a stuck kid waits before I get to them drops from ~8 minutes to under 3 — 90 seconds for the flag plus up to a minute to finish with the kid I’m helping (timed with a tally sheet for one session before and every session after), and the tutor keeps it running for the whole practice block in at least 5 of 6 sessions.',
       why: 'Day one is something you could literally do. The testers are people Sam already knows. Success is two numbers a mentor could check, with a baseline measured before the change.',
       attempts: 1,
     },
 
     'mvp-plan/final-plan': {
-      answer: 'PROBLEM: Small-group math tutors can’t see every kid’s paper at once, so stuck kids wait silently and finished kids drift off-task.\nUSER: a tutor running 6–8 mixed-level kids at one table.\nCORE NEED: know within a minute who’s stuck or done.\nCORE FEATURES: (1) live table grid — one overhead webcam shows every paper as a tile; (2) stuck/done flags — amber after 3 minutes of no writing, green on DONE; (3) one end-of-session snapshot per kid.\nFIRST TESTABLE VERSION: a 4K webcam on a boom stand plus a laptop web page; I draw seat boxes once and run it through a 20-minute practice block.\nFIRST TESTERS: my Tuesday group (7 kids), Priya’s Thursday group, Marcus’s math club.\nSUCCESS (2 weeks, 6 sessions): the longest stuck-kid wait drops from ~8 to under 3 minutes, and tutors keep it on for the whole block in 5 of 6 sessions.',
+      answer: 'PROBLEM: Small-group math tutors can’t see every kid’s paper at once, so stuck kids wait silently and finished kids drift off-task.\nUSER: a tutor running 6–8 mixed-level kids at one table.\nCORE NEED: know within two minutes who’s stuck or done.\nCORE FEATURES: (1) live table grid — one overhead webcam shows every paper as a tile; (2) stuck/done flags — amber after 90 seconds of no writing, green on DONE; (3) one end-of-session snapshot per kid.\nFIRST TESTABLE VERSION: a 4K webcam on a boom stand plus a laptop web page; I draw seat boxes once and run it through a 20-minute practice block.\nFIRST TESTERS: my Tuesday group (7 kids), Priya’s Thursday group, Marcus’s math club.\nSUCCESS (2 weeks, 6 sessions): the longest stuck-kid wait drops from ~8 to under 3 minutes (90-second flag plus about a minute to get there), and tutors keep it on for the whole block in 5 of 6 sessions.',
       why: 'All seven parts fit in under 160 words, and each one matches the artifacts before it. A mentor could poke holes in it without asking anything.',
       attempts: 2,
     },
@@ -217,7 +217,7 @@ var EXAMPLES = (function () {
     },
 
     'pitch/pitch-outline': {
-      answer: 'SLIDE 1 — THE PROBLEM\nON SCREEN: 7 kids. 7 papers. One pair of eyes.\nI SAY: Small-group math tutors can only look at one kid’s paper at a time. That costs every session 5–10 minutes of stuck kids waiting silently and finished kids drifting off-task.\n\nSLIDE 2 — WHY IT’S PAINFUL TODAY\nON SCREEN: Laps. Hands up. iPads. All miss Jordan.\nI SAY: Tutors walk laps that reach each kid every 4–6 minutes, and quiet kids never raise a hand. iPads show every screen, but kids write math worse on glass and drift — so most groups went back to paper.\n\nSLIDE 3 — MY EXPERIENCE\nON SCREEN: Photo of my Tuesday table, Jordan circled\nI SAY: Tuesday, 4:40 — I’m helping the loudest kid while Jordan has sat stuck on question 3 for nine minutes, arm over his paper. As Marcus put it: “The kid who needs me most is the one who’ll never put his hand up.”\n\nSLIDE 4 — THE SOLUTION\nON SCREEN: Every paper. One screen. Stuck kids flagged.\nI SAY: TableView is one webcam on a stand over the table: every kid’s paper is a tile on my laptop, and a tile turns amber when a kid stops writing for 3 minutes. I know who’s stuck or done within a minute, and each paper is saved at the end.\n\nSLIDE 5 — THE PLAN\nON SCREEN: 3 groups. 2 weeks. Waits under 3 minutes.\nI SAY: I’m testing it with my Tuesday group, Priya’s Thursday group and Marcus’s math club for six sessions; success is the longest stuck-kid wait dropping from about 8 minutes to under 3. My ask: if you run a small group, lend me your table for two sessions.',
+      answer: 'SLIDE 1 — THE PROBLEM\nON SCREEN: 7 kids. 7 papers. One pair of eyes.\nI SAY: Small-group math tutors can only look at one kid’s paper at a time. That costs every session 5–10 minutes of stuck kids waiting silently and finished kids drifting off-task.\n\nSLIDE 2 — WHY IT’S PAINFUL TODAY\nON SCREEN: Laps. Hands up. iPads. All miss Jordan.\nI SAY: Tutors walk laps that reach each kid every 4–6 minutes, and quiet kids never raise a hand. iPads show every screen, but kids write math worse on glass and drift — so most groups went back to paper.\n\nSLIDE 3 — MY EXPERIENCE\nON SCREEN: Photo of my Tuesday table, Jordan circled\nI SAY: Tuesday, 4:40 — I’m helping the loudest kid while Jordan has sat stuck on question 3 for nine minutes, arm over his paper. As Marcus put it: “The kid who needs me most is the one who’ll never put his hand up.”\n\nSLIDE 4 — THE SOLUTION\nON SCREEN: Every paper. One screen. Stuck kids flagged.\nI SAY: TableView is one webcam on a stand over the table: every kid’s paper is a tile on my laptop, and a tile turns amber when a kid stops writing for 90 seconds. I know who’s stuck or done within two minutes, and each paper is saved at the end.\n\nSLIDE 5 — THE PLAN\nON SCREEN: 3 groups. 2 weeks. Waits under 3 minutes.\nI SAY: I’m testing it with my Tuesday group, Priya’s Thursday group and Marcus’s math club for six sessions; success is the longest stuck-kid wait dropping from about 8 minutes to under 3. My ask: if you run a small group, lend me your table for two sessions.',
       why: 'The five slides are in the required order, and each ON SCREEN line is 8 words or fewer. The pitch ends with one specific ask, and every number already appeared earlier in the worksheet.',
       attempts: 1,
     },
