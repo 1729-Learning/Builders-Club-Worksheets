@@ -943,8 +943,9 @@ function lessonHTML(step, k) {
 
 /* ---- worked example (public/examples.js) ----
    One finished project answered against every step's real prompt, opened inline
-   from the 💡 Example button. Read-only, never sent to the reviewer, and about a
-   different idea on purpose so it models the thinking rather than the answer. */
+   from the 💡 Example button. Read-only, and about a different idea on purpose so
+   it models the thinking rather than the answer. The AI reviewer is shown the
+   same example server-side (lib/prompts.js) so it can recognize a copy. */
 
 function exampleFor(k) {
   return typeof EXAMPLES !== 'undefined' && EXAMPLES.steps[k] ? EXAMPLES.steps[k] : null;
